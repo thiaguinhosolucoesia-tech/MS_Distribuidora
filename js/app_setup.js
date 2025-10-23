@@ -1,6 +1,6 @@
 /* ==================================================================
 PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 1: SETUP
-Versão: FINAL COMPLETA e CORRIGIDA (Chamada setupEventListeners Adicionada) - 23/10/2025
+Versão: FINAL COMPLETA e CORRIGIDA (Listener Timing Fix) - 23/10/2025
 ==================================================================
 */
 
@@ -40,23 +40,18 @@ function showNotification(message, type = 'success') {
   notification.id = 'notification';
   notification.className = `notification ${type}`;
   notification.textContent = message;
-  // Garante que o elemento exista antes de adicionar
-  if (document.body) {
-      document.body.appendChild(notification);
-      void notification.offsetWidth; // Força reflow
-      notification.classList.add('show');
-
-      setTimeout(() => {
-        notification.classList.remove('show');
-        notification.addEventListener('transitionend', () => {
-          if (document.body.contains(notification)) {
-            document.body.removeChild(notification);
-          }
-        }, { once: true });
-      }, 4000);
-  } else {
-      console.error("document.body não encontrado para exibir notificação.");
-  }
+  const container = document.getElementById('notification-container'); // Usa o container dedicado
+  if (container) {
+    container.appendChild(notification);
+    void notification.offsetWidth;
+    notification.classList.add('show');
+    setTimeout(() => {
+      notification.classList.remove('show');
+      notification.addEventListener('transitionend', () => {
+        if (container.contains(notification)) container.removeChild(notification);
+      }, { once: true });
+    }, 4000);
+  } else { console.error("Container de notificações não encontrado."); }
 }
 
 /* ==================================================================
@@ -94,6 +89,7 @@ let currentUser = null, allPedidos = {}, configData = { produtos: [] }, vendedor
 let lightboxMedia = [], currentLightboxIndex = 0, filesToUpload = [], initialDataLoaded = false;
 let itensAdicionadosState = [];
 let isMyAgendaViewActive = false;
+let listenersAttached = false; // Flag para garantir que listeners sejam anexados só uma vez
 
 // Constantes
 const FORMAS_PAGAMENTO = ['PIX', 'Boleto', 'Cartão de Crédito', 'Dinheiro', 'Transferência'];
@@ -130,8 +126,8 @@ const formatDateTime = (isoString) => isoString ? new Date(isoString).toLocaleSt
 // --- Inicialização do Firebase ---
 let db;
 try {
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); console.log("Firebase inicializado com sucesso."); }
-    else { firebase.app(); console.log("Firebase já estava inicializado."); }
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); console.log("Firebase inicializado."); }
+    else { firebase.app(); console.log("Firebase já inicializado."); }
     db = firebase.database();
 } catch(e) { console.error("Erro CRÍTICO Firebase:", e); setTimeout(() => showNotification("Erro crítico: Falha Firebase.", "error"), 500); throw new Error("Falha Firebase."); }
 
@@ -146,7 +142,7 @@ const loadVendedores = async () => {
         const vendedoresData = snapshot.val();
         if (vendedoresData && typeof vendedoresData === 'object' && Object.keys(vendedoresData).length > 0) {
             vendedores = Object.entries(vendedoresData).map(([key, value]) => ({ id: key, name: value.name || key, role: value.role || 'Vendedor' }));
-            console.log("Vendedores carregados do Firebase:", vendedores);
+            console.log("Vendedores carregados:", vendedores);
         } else {
              console.warn("Nenhum vendedor no Firebase ou formato inválido. Usando simulação.");
              vendedores = [{ name: 'Thiago', role: 'Vendedor 1' }, { name: 'Raul', role: 'Vendedor 2' }, { name: 'Guilherme', role: 'Gestor' }];
@@ -167,17 +163,11 @@ const loginUser = async (user) => {
     if(vendedorDashboard) vendedorDashboard.innerHTML = '<p class="text-center tc my-10 animate-pulse">Carregando...</p>';
 
     await loadConfig();
-    initializeDashboard();
-    listenToPedidos();
+    initializeDashboard(); // Prepara a estrutura do dashboard
+    listenToPedidos(); // Inicia o carregamento e monitoramento dos pedidos (que chamará setupEventListeners)
 
-    // ***** ALTERAÇÃO CRÍTICA: CHAMA setupEventListeners AQUI *****
-    if (typeof setupEventListeners === 'function') {
-        setupEventListeners(); // Chama a função para anexar os listeners DEPOIS que a UI está visível
-    } else {
-        console.error("ERRO GRAVE: Função setupEventListeners não foi encontrada (verifique app_logic.js).");
-        showNotification("Erro: Falha ao carregar interações da página.", "error");
-    }
-    // ***** FIM DA ALTERAÇÃO *****
+    // A chamada setupEventListeners() FOI MOVIDA para dentro de listenToPedidos,
+    // para garantir que execute APÓS a carga inicial e renderização.
 
     if (isGestor) renderDashboardGerencial(); else switchDashboardTab('vendas');
 };
@@ -190,6 +180,7 @@ const displayLoginScreen = () => {
      if(userScreen) userScreen.classList.remove('hidden'); if(app) app.classList.add('hidden');
      if (userList) { if(vendedores.length > 0){ userList.innerHTML = vendedores.map(user => `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'> <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p> <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p> </div>`).join(''); } else { userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; } } else { console.error("userList não encontrado."); if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login."); }
 };
+
 
 /* ==================================================================
 LÓGICA DO DASHBOARD E KANBAN
@@ -228,7 +219,7 @@ LISTENERS DO FIREBASE
 ==================================================================
 */
 const listenToPedidos = () => {
-    if (!db) { console.error("DB não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false;
+    if (!db) { console.error("DB Firebase não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false; listenersAttached = false; // Reseta flag de listeners
     if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>'); }
     else { console.error("Dashboard não encontrado."); return; } allPedidos = {};
     ref.once('value', snapshot => {
@@ -237,13 +228,31 @@ const listenToPedidos = () => {
         Object.values(allPedidos).forEach(renderCard);
         if(vendedorDashboard){ vendedorDashboard.querySelectorAll('.client-list').forEach(list => { if(list.children.length === 0){ list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } }); }
         initialDataLoaded = true; console.log(`Carga: ${Object.keys(allPedidos).length} pedidos.`);
-        startIndividualListeners(ref);
+
+        // ***** ALTERAÇÃO CRÍTICA: CHAMA setupEventListeners AQUI, APENAS UMA VEZ *****
+        if (!listenersAttached && typeof setupEventListeners === 'function') {
+            setupEventListeners(); // Chama a função para anexar os listeners
+            listenersAttached = true; // Marca que foram anexados
+            console.log("Listeners de eventos configurados após carga inicial.");
+        } else if (listenersAttached) {
+             console.log("Listeners já estavam configurados.");
+        } else {
+             console.error("ERRO GRAVE: Função setupEventListeners não encontrada em app_logic.js");
+             showNotification("Erro: Falha ao carregar interações.", "error");
+        }
+        // ***** FIM DA ALTERAÇÃO *****
+
+        startIndividualListeners(ref); // Inicia listeners individuais para updates
+
     }, error => { console.error("Erro carga inicial:", error); showNotification("Erro dados.", "error"); if (vendedorDashboard) { vendedorDashboard.innerHTML = '<p class="tc text-red-500 my-10">Falha carregar.</p>'; } });
 };
 
 const startIndividualListeners = (ref) => {
+    // Novo pedido
     ref.on('child_added', snapshot => { if (!initialDataLoaded) return; const pedido = { ...snapshot.val(), id: snapshot.key }; if (!allPedidos[pedido.id]) { console.log("Novo:", pedido.id); allPedidos[pedido.id] = pedido; renderCard(pedido); } });
+    // Pedido modificado
     ref.on('child_changed', snapshot => { if (!initialDataLoaded) return; const pedido = { ...snapshot.val(), id: snapshot.key }; console.log("Modificado:", pedido.id); allPedidos[pedido.id] = pedido; renderCard(pedido); if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedido.id) { openDetailsModal(pedido.id); } });
+    // Pedido removido
     ref.on('child_removed', snapshot => { if (!initialDataLoaded) return; const pedidoId = snapshot.key; console.log("Removido:", pedidoId); delete allPedidos[pedidoId]; const card = document.getElementById(pedidoId); if (card) { const list = card.parentElement; card.remove(); if (list && list.children.length === 0) { list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } } if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedidoId) { detailsModal.classList.add('hidden'); showNotification("Pedido excluído.", "warning"); } });
 };
 
@@ -258,11 +267,13 @@ INICIALIZAÇÃO DA APLICAÇÃO (Chamada no final de app_logic.js)
 */
 // Garante que o DOM esteja pronto ANTES de tentar configurar listeners ou checar login
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', checkLoggedInUser); // Chama checkLoggedInUser quando DOM estiver pronto
+    // Adiciona listener APENAS para checkLoggedInUser. setupEventListeners será chamado DENTRO de loginUser via listenToPedidos.
+    document.addEventListener('DOMContentLoaded', checkLoggedInUser);
 } else {
-    checkLoggedInUser(); // Chama imediatamente se DOM já estiver pronto
+    // DOM já pronto, chama checkLoggedInUser imediatamente.
+    checkLoggedInUser();
 }
 
-// Nota: setupEventListeners agora é chamado DENTRO de loginUser.
+// Nota: setupEventListeners AGORA é chamado DENTRO de listenToPedidos, APÓS a carga inicial dos dados.
 
 // --- FIM app_setup.js ---

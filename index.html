@@ -5,123 +5,115 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>EletroIA - Distribuidora Inteligente v1.0</title>
 
+  {/* Dependências Externas (Tailwind, Fontes, Ícones) */}
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  {/* Link para o CSS local */}
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body class="bg-gray-100">
 
+  {/* TELA DE LOGIN: Visível inicialmente, escondida após login */}
   <div id="userScreen" class="flex items-center justify-center min-h-screen p-4">
     <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
       <img src="https://www.msdistribuidor.com.br/image/catalog/logo.png" alt="MS Distribuidora Logo" class="mx-auto mb-4 h-12">
-      {/**/}
       <p class="text-xl font-semibold text-orange-600">Construindo Parcerias, Distribuindo Soluções</p>
       <p class="text-gray-500 my-8">Acesso ao Painel de Vendas</p>
+      {/* Div onde a lista de botões de usuário será inserida pelo JS */}
       <div id="userList" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <p class="text-gray-400 text-sm col-span-full animate-pulse">Carregando usuários...</p>
+          {/* O JS preencherá esta área */}
       </div>
     </div>
   </div>
 
+  {/* APLICAÇÃO PRINCIPAL: Escondida inicialmente, visível após login */}
   <div id="app" class="hidden flex flex-col min-h-screen">
+    {/* CABEÇALHO FIXO */}
     <header class="bg-white shadow-md sticky top-0 z-40">
       <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center gap-4 flex-wrap">
         {/* Logo */}
         <div class="flex items-center gap-3">
             <img src="https://www.msdistribuidor.com.br/image/catalog/logo.png" alt="MS Distribuidora Logo" class="h-10">
-            {/* <h1 class="text-xl font-bold text-gray-800">EletroIA</h1>
-            <p class="text-sm font-semibold text-blue-800 -mt-1">Distribuidora</p> */}
         </div>
-
-        {/* Busca */}
+        {/* Barra de Busca */}
         <div class="flex-grow max-w-lg relative search-container order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0">
             <input type="search" id="globalSearchInput" placeholder="Buscar Cliente, Pedido# ou Produto..." class="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-            <div id="globalSearchResults" class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-md shadow-lg z-50 hidden max-h-60 overflow-y-auto"></div>
+            {/* Div onde os resultados da busca serão inseridos pelo JS */}
+            <div id="globalSearchResults" class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-md shadow-lg z-50 hidden max-h-60 overflow-y-auto">
+            </div>
         </div>
-
-        {/* Ações e Usuário */}
+        {/* Botões de Ação e Info do Usuário */}
         <div class="flex items-center gap-2 sm:gap-4 order-2 sm:order-3">
-          {/* Botão Minha Agenda */}
           <button id="toggleAgendaBtn" class="btn bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 px-3 py-2 flex items-center gap-1 sm:gap-2" title="Alternar visão: Todos / Meus Pedidos">
             <i class='bx bx-user-pin'></i><span class="hidden md:inline">Minha Agenda</span>
           </button>
-          {/* Botão Config (Gestor) */}
           <button id="configBtn" class="btn bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 flex items-center gap-1 sm:gap-2 hidden" title="Gerenciar Produtos">
             <i class='bx bx-cog'></i><span class="hidden md:inline">Produtos</span>
           </button>
-          {/* Botão Novo Pedido */}
           <button id="addPedidoBtn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 sm:px-4 flex items-center gap-1 sm:gap-2" title="Criar Novo Pedido">
             <i class='bx bx-plus-circle'></i><span class="hidden sm:inline">Novo Pedido</span>
           </button>
-          {/* Info Usuário */}
           <div class="text-right">
-            <p id="currentUserName" class="font-semibold text-gray-700 text-sm sm:text-base truncate max-w-[100px] sm:max-w-[150px]">...</p>
+            <p id="currentUserName" class="font-semibold text-gray-700 text-sm sm:text-base truncate max-w-[100px] sm:max-w-[150px]"></p>
             <button id="logoutButton" class="text-xs sm:text-sm text-red-500 hover:text-red-700 hover:underline">Sair</button>
           </div>
         </div>
       </div>
     </header>
 
-    {/* Navegação de Abas (Dashboard) - Adicionado Tab Gerencial */}
-     <nav id="dashboard-nav" class="bg-gray-100 border-b border-gray-300 sticky top-[68px] z-30 hidden"> {/* Altura do header */}
+    {/* NAVEGAÇÃO POR ABAS DO DASHBOARD */}
+     <nav id="dashboard-nav" class="bg-gray-100 border-b border-gray-300 sticky top-[68px] z-30 hidden"> {/* Ajuste top-[height_header] se header mudar */}
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
                 <li class="mr-2">
-                    <button data-tab="vendas" class="dashboard-tab inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-blue-600 border-blue-600 active" aria-current="page">
-                       <i class='bx bx-user-pin mr-1'></i> Vendas (Kanban)
+                    <button data-tab="vendas" class="dashboard-tab inline-block p-3 sm:p-4 border-b-2 rounded-t-lg" aria-current="page">
+                       <i class='bx bx-columns mr-1'></i> Vendas (Kanban)
                     </button>
                 </li>
-                <li class="mr-2 hidden" id="tab-btn-gerencial"> {/* Oculto por padrão */}
+                <li class="mr-2 hidden" id="tab-btn-gerencial">
                     <button data-tab="gerencial" class="dashboard-tab inline-block p-3 sm:p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300">
                         <i class='bx bxs-dashboard mr-1'></i> Painel Gerencial
                     </button>
                 </li>
-                {/* Adicionar mais tabs aqui se necessário */}
             </ul>
         </div>
     </nav>
 
+    {/* CONTEÚDO PRINCIPAL (Abas do Dashboard) */}
     <main class="container mx-auto p-4 sm:p-6 lg:px-8 flex-grow">
-      {/* Conteúdo das Abas */}
+      {/* ABA DE VENDAS (KANBAN) */}
       <div id="vendas-content" class="dashboard-content">
-          <h2 id="dashboard-title" class="text-xl font-semibold mb-4 text-gray-700">Visão Geral - Todos Vendedores</h2>
+          <h2 id="dashboard-title" class="text-xl font-semibold mb-4 text-gray-700"></h2>
+          {/* Div onde as seções dos vendedores e o Kanban serão inseridos pelo JS */}
           <div id="vendedorDashboard" class="flex flex-col gap-10">
-            <p class="text-center text-gray-500 animate-pulse">Carregando dashboard...</p>
           </div>
       </div>
 
-      {/* Conteúdo da Aba Gerencial (Oculto por Padrão) */}
+      {/* ABA GERENCIAL */}
       <div id="gerencial-content" class="dashboard-content hidden">
           <h2 class="text-xl font-semibold mb-6 text-gray-700">Painel Gerencial</h2>
           <div id="dashboardGerencialContent" class="space-y-6">
-              {/* Cards de Métricas */}
+              {/* Div onde os cards de métricas serão inseridos pelo JS */}
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" id="gerencial-cards">
-                 <p class="text-gray-500 animate-pulse col-span-full">Calculando métricas...</p>
-                 {/* Cards serão inseridos pelo JS */}
               </div>
-              {/* Ranking Vendedores */}
+              {/* Div onde o ranking de vendedores será inserido pelo JS */}
               <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
-                 <h3 class="text-lg font-semibold mb-3 text-gray-800">Ranking de Vendedores (Pedidos Entregues no Mês)</h3>
+                 <h3 class="text-lg font-semibold mb-3 text-gray-800">Ranking Vendedores (Mês Atual)</h3>
                  <div id="gerencial-ranking-vendedores">
-                     <p class="text-gray-500 animate-pulse">Calculando ranking...</p>
-                     {/* Tabela/Lista será inserida pelo JS */}
                  </div>
               </div>
-               {/* Pedidos por Status */}
+              {/* Div onde a contagem de pedidos por status será inserida pelo JS */}
               <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
-                 <h3 class="text-lg font-semibold mb-3 text-gray-800">Pedidos por Status (Geral)</h3>
+                 <h3 class="text-lg font-semibold mb-3 text-gray-800">Pedidos por Status</h3>
                  <div id="gerencial-pedidos-status">
-                     <p class="text-gray-500 animate-pulse">Contando pedidos...</p>
-                     {/* Gráfico ou lista será inserida pelo JS */}
                  </div>
               </div>
-              {/* Mais seções podem ser adicionadas */}
           </div>
       </div>
-
     </main>
 
+    {/* RODAPÉ */}
      <footer class="bg-gray-800 text-gray-300 mt-8 py-4">
         <div class="container mx-auto px-4 text-center text-xs sm:text-sm">
             <p>&copy; 2025 EletroIA Distribuidora Inteligente - by thIAguinho Soluções</p>
@@ -129,13 +121,10 @@
     </footer>
   </div>
 
-  {/* ========================================================== */}
   {/* ======================= MODAIS =========================== */}
-  {/* ========================================================== */}
 
-  {/* MODAL DE NOVO PEDIDO */}
+  {/* MODAL NOVO PEDIDO */}
   <div id="pedidoModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
-    {/* Conteúdo do Modal (inalterado) */}
     <div class="modal-content w-full max-w-xl">
       <div class="modal-header">
         <h2 id="pedidoModalTitle" class="text-2xl font-bold text-gray-800">Novo Pedido</h2>
@@ -145,8 +134,8 @@
         <form id="pedidoForm" class="space-y-4">
           <input type="hidden" id="pedidoId">
           <div><label for="clienteNome" class="block text-sm font-medium text-gray-700">Cliente / Empresa *</label><input id="clienteNome" type="text" placeholder="Nome ou Razão Social" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></div>
-          <div><label for="vendedorResponsavel" class="block text-sm font-medium text-gray-700">Vendedor *</label><select id="vendedorResponsavel" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"><option value="">Carregando...</option></select></div>
-          <div><label class="block text-sm font-medium text-gray-700">Itens Iniciais (Opcional)</label><div id="servicosList" class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-md bg-gray-50 max-h-40 overflow-y-auto"><p class="text-gray-400 text-sm col-span-full">Carregando...</p></div></div>
+          <div><label for="vendedorResponsavel" class="block text-sm font-medium text-gray-700">Vendedor *</label><select id="vendedorResponsavel" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"><option value=""></option></select></div>
+          <div><label class="block text-sm font-medium text-gray-700">Itens Iniciais (Opcional)</label><div id="servicosList" class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-md bg-gray-50 max-h-40 overflow-y-auto"></div></div>
           <div><label for="pedidoObservacoes" class="block text-sm font-medium text-gray-700">Observações Iniciais</label><textarea id="pedidoObservacoes" placeholder="Ex: Urgência, item específico..." rows="3" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea></div>
         </form>
       </div>
@@ -154,97 +143,29 @@
     </div>
   </div>
 
-  {/* MODAL DE DETALHES (Com Novas Seções) */}
+  {/* MODAL DETALHES DO PEDIDO */}
   <div id="detailsModal" class="modal fixed inset-0 z-50 hidden items-start justify-center p-4 modal-backdrop">
-    <div class="modal-content w-full max-w-6xl">
-      {/* Header (inalterado) */}
-      <div class="modal-header"><div class="flex justify-between items-start w-full"><div><h2 id="detailsClienteNome" class="text-2xl font-bold text-gray-800">Carregando...</h2><p id="detailsPedidoNumero" class="text-sm font-bold text-blue-800">Pedido #...</p></div><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div></div>
-
-      <div class="modal-body">
-        <div class="os-details-container">
-          {/* Header Interno (inalterado) */}
-          <div class="os-header"><div class="flex justify-between items-start flex-wrap gap-4"><div class="mb-4"><p id="detailsAgendamento" class="text-sm text-gray-600">Aberto em: ...</p><p id="detailsVendedor" class="text-lg text-gray-800 font-bold mt-1">Vendedor: ...</p></div><div class="bg-gray-100 p-4 rounded-lg text-center w-full sm:w-auto flex-shrink-0 border border-gray-200"><p class="text-gray-600 font-bold uppercase text-xs">Valor Atual</p><p id="detailsValorTotalDisplay" class="font-bold text-3xl text-green-700">R$ 0,00</p></div></div><div id="detailsObservacoesContainer" class="hidden mt-4 pt-4 border-t border-gray-200"></div></div>
-
-          <div class="os-content">
-            {/* Coluna Principal (Esquerda) */}
-            <div class="space-y-6">
-              {/* Itens do Pedido (inalterado) */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title">📦 Itens do Pedido</h3><div id="detailsItensContainer" class="mt-1 space-y-2"><p class="text-gray-400 text-sm">Nenhum item.</p></div><div class="mt-4 pt-4 border-t border-gray-200"><h4 class="text-sm font-medium text-gray-600 mb-2">Adicionar Item</h4><div class="flex gap-2"><select id="detailsServicosList" class="p-2 border rounded w-full bg-white flex-grow focus:ring-blue-500 focus:border-blue-500"><option value="">-- Carregando --</option></select><button type="button" id="detailsAddServicoBtn" class="btn btn-dark-gray px-3 flex-shrink-0">Add</button></div></div></div>
-
-              {/* *** NOVA SEÇÃO: Histórico do Cliente *** */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
-                <h3 class="section-title">📈 Histórico Recente do Cliente</h3>
-                <div id="detailsHistoricoCliente" class="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2">
-                   <p class="text-gray-400 text-sm italic animate-pulse">Buscando histórico...</p>
-                   {/* Histórico será preenchido pelo JS */}
-                </div>
-              </div>
-
-              {/* Galeria de Mídia (inalterado) */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title">🖼️ Mídia Anexada</h3><div id="thumbnail-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4"><p class="text-gray-400 text-sm col-span-full tc p-4">Nenhuma mídia.</p></div></div>
-
-              {/* Histórico do Pedido (inalterado) */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title">📜 Histórico Deste Pedido</h3><div id="timelineContainer" class="timeline mt-4 space-y-6"><p class="text-gray-400 text-sm tc p-4">Nenhum histórico.</p></div></div>
-            </div>
-
-            {/* Coluna de Ações (Direita) */}
-            <div class="os-actions-section space-y-6">
-              {/* *** NOVA SEÇÃO: Assistente IA *** */}
-              <div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg shadow p-4 border border-blue-200">
-                  <h3 class="section-title text-blue-800"><i class='bx bxs-magic-wand mr-1'></i> Assistente IA</h3>
-                  <div id="assistenteVendasOutput" class="mt-3 space-y-2 text-sm text-blue-900">
-                     <p class="animate-pulse">Analisando dados...</p>
-                     {/* Sugestões da IA aqui */}
-                  </div>
-                   <button id="geminiRefreshBtn" class="text-xs text-blue-600 hover:underline mt-2 flex items-center gap-1"><i class='bx bx-refresh'></i> Gerar Novas Sugestões</button>
-              </div>
-
-              {/* Adicionar Atualização (Log/Mídia - inalterado) */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title">➕ Adicionar Atualização</h3><form id="logForm" class="space-y-4"><input type="hidden" id="logPedidoId"><div><label for="logDescricao" class="block text-sm font-medium text-gray-700">Descrição *</label><textarea id="logDescricao" placeholder="Negociação, obs..." rows="3" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Anexar Mídia</label><div class="grid grid-cols-2 gap-2"><button type="button" id="openCameraBtn" class="w-full btn btn-dark-gray"><i class='bx bxs-camera mr-1'></i> Câm</button><button type="button" id="openGalleryBtn" class="w-full btn btn-dark-gray"><i class='bx bxs-file-plus mr-1'></i> Arq</button></div><input id="media-input" type="file" class="hidden" multiple accept="image/*,video/*,application/pdf"><p id="fileName" class="text-sm text-gray-500 mt-1 truncate h-4"></p></div><button type="submit" class="w-full btn btn-green flex items-center justify-center gap-2"><i class='bx bx-message-square-add'></i> Add Histórico</button></form></div>
-
-              {/* Fechamento (inalterado) */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title">💵 Fechamento</h3><div class="form-group"><label for="detailsFormaPagamento" class="block text-sm font-medium text-gray-700">Pagamento</label><select id="detailsFormaPagamento" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"><option value="">Carregando...</option></select></div><div class="form-group mt-4"><label for="detailsDesconto" class="block text-sm font-medium text-gray-700">Desconto (R$)</label><input id="detailsDesconto" type="number" step="0.01" value="0" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></div><button type="button" id="saveAndNextStatusBtn" class="w-full btn btn-blue mt-6"><i class='bx bx-fast-forward-circle mr-1'></i> Salvar e Avançar</button></div>
-
-              {/* *** NOVO BOTÃO: Gerar Oferta *** */}
-               <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
-                   <button id="gerarOfertaWhatsappBtn" class="w-full btn bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2">
-                       <i class='bx bxl-whatsapp'></i> Gerar Texto Oferta (Zap)
-                   </button>
-               </div>
-
-              {/* Excluir Pedido (inalterado) */}
-              <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><button id="deleteBtn" class="w-full btn btn-red hidden"><i class='bx bx-trash mr-1'></i> Excluir Pedido</button></div>
-            </div>
-          </div>
-        </div>
-      </div>
+     <div class="modal-content w-full max-w-6xl">
+      <div class="modal-header"><div class="flex justify-between items-start w-full"><div><h2 id="detailsClienteNome" class="text-2xl font-bold text-gray-800"></h2><p id="detailsPedidoNumero" class="text-sm font-bold text-blue-800"></p></div><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div></div>
+      <div class="modal-body"><div class="os-details-container"><div class="os-header"><div class="flex justify-between items-start flex-wrap gap-4"><div class="mb-4"><p id="detailsAgendamento" class="text-sm text-gray-600"></p><p id="detailsVendedor" class="text-lg text-gray-800 font-bold mt-1"></p></div><div class="bg-gray-100 p-4 rounded-lg text-center w-full sm:w-auto flex-shrink-0 border border-gray-200"><p class="text-gray-600 font-bold uppercase text-xs">Valor Atual</p><p id="detailsValorTotalDisplay" class="font-bold text-3xl text-green-700"></p></div></div><div id="detailsObservacoesContainer" class="hidden mt-4 pt-4 border-t border-gray-200"></div></div><div class="os-content"><div class="space-y-6"><div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-basket mr-1'></i>Itens</h3><div id="detailsItensContainer" class="mt-1 space-y-2"></div><div class="mt-4 pt-4 border-t border-gray-200"><h4 class="text-sm font-medium text-gray-600 mb-2">Adicionar Item</h4><div class="flex gap-2"><select id="detailsServicosList" class="p-2 border rounded w-full bg-white flex-grow focus:ring-blue-500 focus:border-blue-500"><option value=""></option></select><button type="button" id="detailsAddServicoBtn" class="btn btn-dark-gray px-3 flex-shrink-0">Add</button></div></div></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-history mr-1'></i>Histórico Cliente</h3><div id="detailsHistoricoCliente" class="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2"></div></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-images mr-1'></i>Mídia</h3><div id="thumbnail-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4"></div></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-list-ul mr-1'></i>Histórico Pedido</h3><div id="timelineContainer" class="timeline mt-4 space-y-6"></div></div></div><div class="os-actions-section space-y-6"><div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg shadow p-4 border border-blue-200"><h3 class="section-title text-blue-800"><i class='bx bxs-magic-wand mr-1'></i>Assistente IA</h3><div id="assistenteVendasOutput" class="mt-3 space-y-2 text-sm text-blue-900"></div><button id="geminiRefreshBtn" class="text-xs text-blue-600 hover:underline mt-2 flex items-center gap-1 hidden"><i class='bx bx-refresh'></i> Novas Sugestões</button></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-message-add mr-1'></i>Atualização</h3><form id="logForm" class="space-y-4"><input type="hidden" id="logPedidoId"><div><label for="logDescricao" class="block text-sm font-medium text-gray-700">Descrição *</label><textarea id="logDescricao" placeholder="Negociação, obs..." rows="3" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Anexar</label><div class="grid grid-cols-2 gap-2"><button type="button" id="openCameraBtn" class="w-full btn btn-dark-gray"><i class='bx bxs-camera mr-1'></i> Câm</button><button type="button" id="openGalleryBtn" class="w-full btn btn-dark-gray"><i class='bx bxs-file-plus mr-1'></i> Arq</button></div><input id="media-input" type="file" class="hidden" multiple accept="image/*,video/*,application/pdf"><p id="fileName" class="text-sm text-gray-500 mt-1 truncate h-4"></p></div><button type="submit" class="w-full btn btn-green flex items-center justify-center gap-2"><i class='bx bx-message-square-add'></i> Add Histórico</button></form></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-dollar-circle mr-1'></i>Fechamento</h3><div class="form-group"><label for="detailsFormaPagamento" class="block text-sm font-medium text-gray-700">Pagamento</label><select id="detailsFormaPagamento" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"><option value=""></option></select></div><div class="form-group mt-4"><label for="detailsDesconto" class="block text-sm font-medium text-gray-700">Desconto (R$)</label><input id="detailsDesconto" type="number" step="0.01" value="0" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></div><button type="button" id="saveAndNextStatusBtn" class="w-full btn btn-blue mt-6"><i class='bx bx-fast-forward-circle mr-1'></i> Salvar e Avançar</button></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><button id="gerarOfertaWhatsappBtn" class="w-full btn bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"><i class='bx bxl-whatsapp'></i> Gerar Txt Oferta</button></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><button id="deleteBtn" class="w-full btn btn-red hidden"><i class='bx bx-trash mr-1'></i> Excluir Pedido</button></div></div></div></div></div>
     </div>
   </div>
 
-  {/* MODAL DE CONFIGURAÇÕES */}
+  {/* MODAL CONFIGURAÇÕES */}
   <div id="configModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
-      {/* Conteúdo do Modal (inalterado) */}
-      <div class="modal-content w-full max-w-3xl"><div class="modal-header"><h2 class="text-2xl font-bold text-gray-800">⚙️ Gerenciar Produtos</h2><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div><div class="modal-body"><div><h3 class="section-title">Catálogo</h3><div id="configServicosList" class="space-y-2 mb-4 max-h-60 overflow-y-auto border p-2 rounded bg-gray-50"><p class="text-gray-400 tc">Carregando...</p></div><form id="addServicoForm" class="flex flex-wrap gap-2 border-t pt-4"><input type="text" id="newServicoName" placeholder="Nome Produto/Serviço" class="p-2 border rounded flex-grow min-w-[200px] bg-white focus:ring-blue-500 focus:border-blue-500" required><input type="number" id="newServicoPrice" placeholder="Preço" class="p-2 border rounded w-full sm:w-auto bg-white focus:ring-blue-500 focus:border-blue-500" required step="0.01" min="0"><button type="submit" class="btn btn-blue w-full sm:w-auto">Adicionar</button></form></div></div><div class="modal-footer"><button type="button" class="btn-close-modal btn btn-gray">Fechar</button></div></div>
+      <div class="modal-content w-full max-w-3xl"><div class="modal-header"><h2 class="text-2xl font-bold text-gray-800">⚙️ Gerenciar Produtos</h2><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div><div class="modal-body"><div><h3 class="section-title">Catálogo</h3><div id="configServicosList" class="space-y-2 mb-4 max-h-60 overflow-y-auto border p-2 rounded bg-gray-50"></div><form id="addServicoForm" class="flex flex-wrap gap-2 border-t pt-4"><input type="text" id="newServicoName" placeholder="Nome Produto/Serviço" class="p-2 border rounded flex-grow min-w-[200px] bg-white focus:ring-blue-500 focus:border-blue-500" required><input type="number" id="newServicoPrice" placeholder="Preço" class="p-2 border rounded w-full sm:w-auto bg-white focus:ring-blue-500 focus:border-blue-500" required step="0.01" min="0"><button type="submit" class="btn btn-blue w-full sm:w-auto">Adicionar</button></form></div></div><div class="modal-footer"><button type="button" class="btn-close-modal btn btn-gray">Fechar</button></div></div>
   </div>
 
-  {/* Lightbox e Confirm Delete (inalterados) */}
-  <div id="lightbox" class="modal fixed inset-0 z-[100] hidden items-center justify-center p-4 modal-backdrop"><div class="absolute inset-0" id="lightbox-close-bg"></div><div class="relative bg-black bg-opacity-75 p-4 rounded-lg max-w-4xl max-h-[90vh] w-auto"><div id="lightbox-content" class="flex items-center justify-center overflow-auto max-h-[calc(90vh-4rem)]"><p class="text-white">Carregando...</p></div><button id="lightbox-close" class="absolute -top-3 -right-3 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center text-2xl shadow-lg border-2 border-gray-300">&times;</button></div></div>
-  <div id="confirmDeleteModal" class="modal fixed inset-0 z-[101] hidden items-center justify-center p-4 modal-backdrop"><div class="modal-content w-full max-w-md"><div class="modal-header items-center"><i class='bx bxs-error-circle text-red-600 text-3xl mr-3'></i><h2 class="text-xl font-bold text-gray-800">Confirmar</h2></div><div class="modal-body"><p id="confirmDeleteText" class="text-center text-gray-700">?</p></div><div class="modal-footer"><button id="cancelDeleteBtn" class="btn btn-gray">Cancelar</button><button id="confirmDeleteBtn" class="btn btn-red">Excluir</button></div></div></div>
+  {/* LIGHTBOX */}
+  <div id="lightbox" class="modal fixed inset-0 z-[100] hidden items-center justify-center p-4 modal-backdrop"><div class="absolute inset-0" id="lightbox-close-bg"></div><div class="relative bg-black bg-opacity-75 p-4 rounded-lg max-w-4xl max-h-[90vh] w-auto"><div id="lightbox-content" class="flex items-center justify-center overflow-auto max-h-[calc(90vh-4rem)]"></div><button id="lightbox-close" class="absolute -top-3 -right-3 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center text-2xl shadow-lg border-2 border-gray-300">&times;</button></div></div>
+  {/* CONFIRM DELETE */}
+  <div id="confirmDeleteModal" class="modal fixed inset-0 z-[101] hidden items-center justify-center p-4 modal-backdrop"><div class="modal-content w-full max-w-md"><div class="modal-header items-center"><i class='bx bxs-error-circle text-red-600 text-3xl mr-3'></i><h2 class="text-xl font-bold text-gray-800">Confirmar</h2></div><div class="modal-body"><p id="confirmDeleteText" class="text-center text-gray-700"></p></div><div class="modal-footer"><button id="cancelDeleteBtn" class="btn btn-gray">Cancelar</button><button id="confirmDeleteBtn" class="btn btn-red">Excluir</button></div></div></div>
 
-  {/* Elemento para Notificações */}
-  {/* Notifications serão adicionadas aqui pelo JS */}
-
-  {/* SCRIPTS */}
+  {/* Scripts Firebase e App */}
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  {/* Link para o SDK do Gemini (Client-side) - Necessário para chamadas diretas */}
-  <script type="module">
-    // Exemplo de como importar (ajuste conforme a documentação oficial do SDK web do Gemini se disponível)
-    // import { GoogleGenerativeAI } from "https://cdn.jsdelivr.net/npm/@google/generative-ai/+esm";
-    // console.log("SDK Gemini importado (ou tentativa)");
-    // Se não houver SDK web oficial fácil, faremos via fetch API REST
-  </script>
-  <script src="js/app.js"></script>
+  <script src="js/app_setup.js"></script>   {/* **** CARREGA SETUP PRIMEIRO **** */}
+  <script src="js/app_logic.js"></script>    {/* **** CARREGA LÓGICA DEPOIS **** */}
 
 </body>
 </html>

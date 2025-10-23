@@ -4,7 +4,7 @@ Motor:
 - Arquitetura de UI Multi-Vendedor (Base: Habibi)
 - Fluxo de Pedidos e Mídia (Base: Chevron)
 - Lógica de Produtos (Base: Habibi/Techmess)
-Versão: Completa e Corrigida (ReferenceError Fix) - 23/10/2025
+Versão: Completa e Corrigida FINAL (Funções ausentes adicionadas) - 23/10/2025
 ==================================================================
 */
 
@@ -17,7 +17,7 @@ const firebaseConfig = {
   authDomain: "eletroia-distribuidora.firebaseapp.com",
   databaseURL: "https://eletroia-distribuidora-default-rtdb.firebaseio.com",
   projectId: "eletroia-distribuidora",
-  storageBucket: "eletroia-distribuidora.appspot.com", // Verifique se é .appspot.com ou .firebasestorage.app no seu console
+  storageBucket: "eletroia-distribuidora.appspot.com", // Verifique se é .appspot.com ou .firebasestorage.app
   messagingSenderId: "579178573325",
   appId: "1:579178573325:web:b1b2295f9dbb0aa2252f44"
 };
@@ -29,7 +29,6 @@ FIM DA SEÇÃO DE CREDENCIAIS
 ==================================================================
 */
 
-
 /* ==================================================================
 SISTEMA DE NOTIFICAÇÕES (Base Chevron)
 ==================================================================
@@ -37,30 +36,22 @@ SISTEMA DE NOTIFICAÇÕES (Base Chevron)
 function showNotification(message, type = 'success') {
   const existingNotifications = document.querySelectorAll('.notification');
   existingNotifications.forEach(notif => notif.remove());
-
   const notification = document.createElement('div');
   notification.id = 'notification';
   notification.className = `notification ${type}`;
   notification.textContent = message;
-  // Garante que o elemento exista antes de adicionar
   if (document.body) {
-      document.body.appendChild(notification);
-      void notification.offsetWidth; // Força reflow
-      notification.classList.add('show');
-
-      setTimeout(() => {
-        notification.classList.remove('show');
-        notification.addEventListener('transitionend', () => {
-          if (document.body.contains(notification)) {
-            document.body.removeChild(notification);
-          }
-        }, { once: true });
-      }, 4000);
-  } else {
-      console.error("document.body não encontrado para exibir notificação.");
-  }
+    document.body.appendChild(notification);
+    void notification.offsetWidth;
+    notification.classList.add('show');
+    setTimeout(() => {
+      notification.classList.remove('show');
+      notification.addEventListener('transitionend', () => {
+        if (document.body.contains(notification)) document.body.removeChild(notification);
+      }, { once: true });
+    }, 4000);
+  } else { console.error("document.body não encontrado para notificação."); }
 }
-
 
 /* ==================================================================
 UPLOAD DE ARQUIVOS (Base Chevron)
@@ -71,23 +62,19 @@ const uploadFileToCloudinary = async (file) => {
   formData.append('file', file);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
   const apiUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
-
   try {
     showNotification(`Enviando ${file.name}...`, 'warning');
     const response = await fetch(apiUrl, { method: 'POST', body: formData });
-
     if (!response.ok) {
-       const errorData = await response.json();
-       console.error("Erro Cloudinary:", errorData);
+       const errorData = await response.json(); console.error("Erro Cloudinary:", errorData);
        throw new Error(errorData.error?.message || `Falha no upload (${response.status})`);
     }
     const data = await response.json();
-     showNotification(`'${file.name}' enviado com sucesso!`, 'success');
+    showNotification(`'${file.name}' enviado!`, 'success');
     return data.secure_url;
-
   } catch (error) {
-    console.error("Erro no upload para o Cloudinary:", error);
-    showNotification(`Erro no upload de ${file.name}: ${error.message}`, 'error');
+    console.error("Erro no upload Cloudinary:", error);
+    showNotification(`Erro upload ${file.name}: ${error.message}`, 'error');
     throw error;
   }
 };
@@ -97,45 +84,27 @@ INICIALIZAÇÃO DO SISTEMA E ESTADO GLOBAL
 ==================================================================
 */
 // Estado
-let currentUser = null;
-let allPedidos = {};
-let configData = { produtos: [] };
-let vendedores = [];
-let lightboxMedia = [];
-let currentLightboxIndex = 0;
-let filesToUpload = [];
-let initialDataLoaded = false;
+let currentUser = null, allPedidos = {}, configData = { produtos: [] }, vendedores = [];
+let lightboxMedia = [], currentLightboxIndex = 0, filesToUpload = [], initialDataLoaded = false;
+let itensAdicionadosState = []; // Estado local para itens no modal de detalhes
 
 // Constantes
 const FORMAS_PAGAMENTO = ['PIX', 'Boleto', 'Cartão de Crédito', 'Dinheiro', 'Transferência'];
 const STATUS_LIST = ['Novos-Leads', 'Em-Negociacao', 'Aguardando-Pagamento', 'Entregue'];
 
-// Seletores DOM (Cache de elementos para performance)
-const userScreen = document.getElementById('userScreen');
-const app = document.getElementById('app');
-const userList = document.getElementById('userList');
-const vendedorDashboard = document.getElementById('vendedorDashboard');
-const addPedidoBtn = document.getElementById('addPedidoBtn');
-const logoutButton = document.getElementById('logoutButton');
-const pedidoModal = document.getElementById('pedidoModal');
-const pedidoForm = document.getElementById('pedidoForm');
-const detailsModal = document.getElementById('detailsModal');
-const deleteBtn = document.getElementById('deleteBtn');
-const configBtn = document.getElementById('configBtn');
-const configModal = document.getElementById('configModal');
-const logForm = document.getElementById('logForm');
-const lightbox = document.getElementById('lightbox');
-const mediaInput = document.getElementById('media-input');
-const globalSearchInput = document.getElementById('globalSearchInput');
-const globalSearchResults = document.getElementById('globalSearchResults');
-const confirmDeleteModal = document.getElementById('confirmDeleteModal');
-const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-const confirmDeleteText = document.getElementById('confirmDeleteText');
-const openCameraBtn = document.getElementById('openCameraBtn');
-const openGalleryBtn = document.getElementById('openGalleryBtn');
-const fileNameDisplay = document.getElementById('fileName');
-const lightboxClose = document.getElementById('lightbox-close');
+// Seletores DOM (Cache)
+const userScreen = document.getElementById('userScreen'), app = document.getElementById('app'), userList = document.getElementById('userList'),
+      vendedorDashboard = document.getElementById('vendedorDashboard'), addPedidoBtn = document.getElementById('addPedidoBtn'),
+      logoutButton = document.getElementById('logoutButton'), pedidoModal = document.getElementById('pedidoModal'),
+      pedidoForm = document.getElementById('pedidoForm'), detailsModal = document.getElementById('detailsModal'),
+      deleteBtn = document.getElementById('deleteBtn'), configBtn = document.getElementById('configBtn'),
+      configModal = document.getElementById('configModal'), logForm = document.getElementById('logForm'),
+      lightbox = document.getElementById('lightbox'), mediaInput = document.getElementById('media-input'),
+      globalSearchInput = document.getElementById('globalSearchInput'), globalSearchResults = document.getElementById('globalSearchResults'),
+      confirmDeleteModal = document.getElementById('confirmDeleteModal'), confirmDeleteBtn = document.getElementById('confirmDeleteBtn'),
+      cancelDeleteBtn = document.getElementById('cancelDeleteBtn'), confirmDeleteText = document.getElementById('confirmDeleteText'),
+      openCameraBtn = document.getElementById('openCameraBtn'), openGalleryBtn = document.getElementById('openGalleryBtn'),
+      fileNameDisplay = document.getElementById('fileName'), lightboxClose = document.getElementById('lightbox-close');
 
 // Funções Utilitárias
 const formatCurrency = (value) => `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
@@ -144,22 +113,12 @@ const formatDate = (isoString) => isoString ? new Date(isoString).toLocaleDateSt
 const formatDateTime = (isoString) => isoString ? new Date(isoString).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'Data/Hora Inválida';
 
 // --- Inicialização do Firebase ---
-let db; // Declara db no escopo global
+let db;
 try {
-    if (!firebase.apps.length) {
-       firebase.initializeApp(firebaseConfig);
-       console.log("Firebase inicializado com sucesso.");
-    } else {
-       firebase.app();
-       console.log("Firebase já estava inicializado.");
-    }
-    db = firebase.database(); // Atribui a referência do DB à variável global
-} catch(e) {
-    console.error("Erro CRÍTICO ao inicializar Firebase:", e);
-    setTimeout(() => showNotification("Erro crítico: Falha ao conectar. Verifique console e credenciais.", "error"), 500);
-    // Impede a execução do resto do script se o Firebase falhar
-    throw new Error("Falha na inicialização do Firebase.");
-}
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); console.log("Firebase inicializado."); }
+    else { firebase.app(); console.log("Firebase já inicializado."); }
+    db = firebase.database();
+} catch(e) { console.error("Erro CRÍTICO Firebase:", e); setTimeout(() => showNotification("Erro crítico: Falha Firebase.", "error"), 500); throw new Error("Falha Firebase."); }
 
 /* ==================================================================
 LÓGICA DE LOGIN E AUTENTICAÇÃO
@@ -168,89 +127,47 @@ LÓGICA DE LOGIN E AUTENTICAÇÃO
 const loadVendedores = async () => {
      // Código completo da função loadVendedores
      try {
-        if (!db) throw new Error("Referência do DB Firebase não está disponível.");
+        if (!db) throw new Error("DB Firebase não disponível.");
         const snapshot = await db.ref('vendedores').once('value');
         const vendedoresData = snapshot.val();
-        if (vendedoresData && typeof vendedoresData === 'object') {
-            vendedores = Object.entries(vendedoresData).map(([key, value]) => ({
-                id: key,
-                name: value.name || key,
-                role: value.role || 'Vendedor'
-            }));
-             console.log("Vendedores carregados do Firebase:", vendedores);
+        if (vendedoresData && typeof vendedoresData === 'object' && Object.keys(vendedoresData).length > 0) { // Verifica se não está vazio
+            vendedores = Object.entries(vendedoresData).map(([key, value]) => ({ id: key, name: value.name || key, role: value.role || 'Vendedor' }));
+            console.log("Vendedores carregados:", vendedores);
         } else {
-             console.warn("Nenhum vendedor encontrado ou formato inválido no Firebase. Usando lista simulada.");
-             vendedores = [
-                { name: 'Mauro Andrigo', role: 'Vendedor 1' },
-                { name: 'Thiago Ventura Valencio ', role: 'Vendedor 2' },
-                { name: 'Guilherme', role: 'Gestor' }
-             ];
-             // Opcional: Salvar a lista simulada se o nó 'vendedores' não existir
-             // await db.ref('vendedores').set(vendedores.reduce((obj, v) => { obj[v.name] = { name: v.name, role: v.role }; return obj; }, {}));
+             console.warn("Nenhum vendedor no Firebase ou formato inválido. Usando simulação.");
+             vendedores = [{ name: 'Thiago', role: 'Vendedor 1' }, { name: 'Raul', role: 'Vendedor 2' }, { name: 'Guilherme', role: 'Gestor' }];
         }
-         if(vendedores.length === 0){
-              console.error("CRÍTICO: Nenhuma lista de vendedores disponível.");
-              showNotification("Erro: Lista de vendedores vazia.", "error");
-         }
-     } catch (error) {
-         console.error("Erro ao carregar vendedores:", error);
-         showNotification("Erro ao carregar lista de vendedores.", "error");
-         vendedores = []; // Define como vazio em caso de erro grave
-     }
+         if(vendedores.length === 0){ console.error("CRÍTICO: Lista de vendedores vazia."); showNotification("Erro: Vendedores não configurados.", "error"); }
+     } catch (error) { console.error("Erro loadVendedores:", error); showNotification("Erro carregar vendedores.", "error"); vendedores = []; }
 };
 
 const loginUser = async (user) => {
     // Código completo da função loginUser
-    if (!user || !user.name) {
-        console.error("Tentativa de login com usuário inválido:", user);
-        showNotification("Erro: Usuário inválido.", "error");
-        return;
-    }
-    currentUser = user;
-    localStorage.setItem('eletroIAUser', JSON.stringify(user));
-    const userNameDisplay = document.getElementById('currentUserName');
-    if(userNameDisplay) userNameDisplay.textContent = user.name;
-
-    if(configBtn) configBtn.classList.toggle('hidden', !(user.role && user.role.toLowerCase().includes('gestor')));
-
-    if(userScreen) userScreen.classList.add('hidden');
-    if(app) app.classList.remove('hidden');
-
-    if(vendedorDashboard) vendedorDashboard.innerHTML = '<p class="text-center text-gray-500 my-10 animate-pulse">Carregando dados...</p>';
-
-    await loadConfig();
-    initializeDashboard();
-    listenToPedidos();
+    if (!user || !user.name) { console.error("Login inválido:", user); return; }
+    currentUser = user; localStorage.setItem('eletroIAUser', JSON.stringify(user));
+    const userNameDisplay = document.getElementById('currentUserName'); if(userNameDisplay) userNameDisplay.textContent = user.name;
+    if(configBtn) configBtn.classList.toggle('hidden', !(user.role?.toLowerCase().includes('gestor')));
+    if(userScreen) userScreen.classList.add('hidden'); if(app) app.classList.remove('hidden');
+    if(vendedorDashboard) vendedorDashboard.innerHTML = '<p class="text-center text-gray-500 my-10 animate-pulse">Carregando...</p>';
+    await loadConfig(); initializeDashboard(); listenToPedidos();
 };
 
 const checkLoggedInUser = async () => {
     // Código completo da função checkLoggedInUser
-    await loadVendedores(); // Carrega vendedores PRIMEIRO
+    await loadVendedores();
     const storedUser = localStorage.getItem('eletroIAUser');
     if (storedUser) {
         try {
            const parsedUser = JSON.parse(storedUser);
-           if(vendedores.some(v => v.name === parsedUser.name)){
-               loginUser(parsedUser);
-           } else {
-                console.warn("Usuário salvo não encontrado na lista atual. Forçando logout.");
-                localStorage.removeItem('eletroIAUser');
-                displayLoginScreen();
-           }
-        } catch(e) {
-             console.error("Erro ao parsear usuário salvo:", e);
-             localStorage.removeItem('eletroIAUser');
-             displayLoginScreen();
-        }
-    } else {
-       displayLoginScreen();
-    }
+           if(vendedores.some(v => v.name === parsedUser.name)){ loginUser(parsedUser); }
+           else { console.warn("Usuário salvo não existe mais."); localStorage.removeItem('eletroIAUser'); displayLoginScreen(); }
+        } catch(e) { console.error("Erro parse usuário:", e); localStorage.removeItem('eletroIAUser'); displayLoginScreen(); }
+    } else { displayLoginScreen(); }
 };
 
 const displayLoginScreen = () => {
     // Código completo da função displayLoginScreen
-     if(userScreen) userScreen.classList.remove('hidden');
-     if(app) app.classList.add('hidden');
+     if(userScreen) userScreen.classList.remove('hidden'); if(app) app.classList.add('hidden');
      if (userList) {
         if(vendedores.length > 0){
             userList.innerHTML = vendedores.map(user =>
@@ -259,15 +176,8 @@ const displayLoginScreen = () => {
                   <p class="text-sm text-gray-500 pointer-events-none">${user.role || 'Vendedor'}</p>
                 </div>`
               ).join('');
-        } else {
-             userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Nenhum vendedor configurado. Contacte o administrador.</p>';
-        }
-     } else {
-          console.error("Elemento userList não encontrado.");
-          if(userScreen && !userScreen.classList.contains('hidden')) { // Mostra alerta só se a tela de login estiver visível
-             alert("Erro crítico: Interface de login não carregou corretamente.");
-          }
-     }
+        } else { userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; }
+     } else { console.error("Elemento userList não encontrado."); if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro: Interface de login incompleta."); }
 };
 
 
@@ -277,37 +187,20 @@ LÓGICA DO DASHBOARD
 */
 const initializeDashboard = () => {
     // Código completo da função initializeDashboard
-    if (!vendedorDashboard) { console.error("Elemento vendedorDashboard não encontrado."); showNotification("Erro ao carregar interface.", "error"); return; }
+    if (!vendedorDashboard) { console.error("Elemento vendedorDashboard não encontrado."); showNotification("Erro interface.", "error"); return; }
     if (vendedores.length === 0) { vendedorDashboard.innerHTML = '<p class="text-center text-red-500 my-10">Erro: Vendedores não carregados.</p>'; return; }
-
-    vendedorDashboard.innerHTML = ''; // Limpa antes de recriar
+    vendedorDashboard.innerHTML = ''; // Limpa
     vendedores.forEach(vendedor => {
-        const vendedorSection = document.createElement('section');
-        vendedorSection.className = 'vendedor-section';
-        vendedorSection.id = `section-${vendedor.name.replace(/\s+/g, '-')}`;
-        const header = document.createElement('h2');
-        header.className = 'vendedor-header';
-        header.textContent = vendedor.name;
-        vendedorSection.appendChild(header);
-        const kanbanContainer = document.createElement('div');
-        kanbanContainer.className = 'kanban-container';
+        const vendedorSection = document.createElement('section'); vendedorSection.className = 'vendedor-section'; vendedorSection.id = `section-${vendedor.name.replace(/\s+/g, '-')}`;
+        const header = document.createElement('h2'); header.className = 'vendedor-header'; header.textContent = vendedor.name; vendedorSection.appendChild(header);
+        const kanbanContainer = document.createElement('div'); kanbanContainer.className = 'kanban-container';
         STATUS_LIST.forEach(status => {
-            const statusColumn = document.createElement('div');
-            statusColumn.className = 'status-column';
-            statusColumn.dataset.statusHeader = status;
-            const statusHeader = document.createElement('h3');
-            statusHeader.textContent = formatStatus(status);
-            statusColumn.appendChild(statusHeader);
-            const clientList = document.createElement('div');
-            clientList.className = 'client-list';
-            clientList.dataset.status = status;
-            clientList.dataset.vendedor = vendedor.name;
-            clientList.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4">Carregando...</p>'; // Placeholder
-            statusColumn.appendChild(clientList);
+            const statusColumn = document.createElement('div'); statusColumn.className = 'status-column'; statusColumn.dataset.statusHeader = status;
+            const statusHeader = document.createElement('h3'); statusHeader.textContent = formatStatus(status); statusColumn.appendChild(statusHeader);
+            const clientList = document.createElement('div'); clientList.className = 'client-list'; clientList.dataset.status = status; clientList.dataset.vendedor = vendedor.name; clientList.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4">Carregando...</p>'; statusColumn.appendChild(clientList);
             kanbanContainer.appendChild(statusColumn);
         });
-        vendedorSection.appendChild(kanbanContainer);
-        vendedorDashboard.appendChild(vendedorSection);
+        vendedorSection.appendChild(kanbanContainer); vendedorDashboard.appendChild(vendedorSection);
     });
 };
 
@@ -322,58 +215,19 @@ const createCardHTML = (pedido) => {
     const currentStatusIndex = STATUS_LIST.indexOf(pedido.status);
     const nextStatus = currentStatusIndex < STATUS_LIST.length - 1 ? STATUS_LIST[currentStatusIndex + 1] : null;
     const prevStatus = currentStatusIndex > 0 ? STATUS_LIST[currentStatusIndex - 1] : null;
-
-    return `
-      <div id="${pedido.id}" class="vehicle-card status-${pedido.status}" data-id="${pedido.id}">
-        <div class="flex justify-between items-start">
-            <div class="card-clickable-area cursor-pointer flex-grow space-y-1 pr-2 card-info overflow-hidden">
-              <div class="flex justify-between items-baseline">
-                <p class="name truncate" title="${pedido.clienteNome || ''}">${clienteDisplay}</p>
-                <p class="time flex-shrink-0 ml-2">${dataDisplay}</p>
-              </div>
-              <p class="text-sm truncate service text-gray-600" title="${itensDisplay}">${itensDisplay}</p>
-              <div class="flex justify-between items-center mt-2 pt-1 border-t border-gray-100">
-                 <p class="barber text-xs">${vendedorDisplay}</p>
-                 <p class="price font-semibold">${valorDisplay}</p>
-              </div>
-            </div>
-            <div class="flex flex-col items-center justify-center -mt-1 -mr-1 flex-shrink-0">
-                <button data-id="${pedido.id}" data-new-status="${nextStatus}" class="btn-move-status p-1 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-100 ${!nextStatus ? 'invisible' : ''}" title="Avançar Status"><i class='bx bx-chevron-right text-2xl'></i></button>
-                <button data-id="${pedido.id}" data-new-status="${prevStatus}" class="btn-move-status p-1 rounded-full text-gray-400 hover:text-orange-600 hover:bg-orange-100 ${!prevStatus ? 'invisible' : ''}" title="Retroceder Status"><i class='bx bx-chevron-left text-2xl'></i></button>
-            </div>
-        </div>
-      </div>`;
+    return `<div id="${pedido.id}" class="vehicle-card status-${pedido.status}" data-id="${pedido.id}"><div class="flex justify-between items-start"><div class="card-clickable-area cursor-pointer flex-grow space-y-1 pr-2 card-info overflow-hidden"><div class="flex justify-between items-baseline"><p class="name truncate" title="${pedido.clienteNome || ''}">${clienteDisplay}</p><p class="time flex-shrink-0 ml-2">${dataDisplay}</p></div><p class="text-sm truncate service text-gray-600" title="${itensDisplay}">${itensDisplay}</p><div class="flex justify-between items-center mt-2 pt-1 border-t border-gray-100"><p class="barber text-xs">${vendedorDisplay}</p><p class="price font-semibold">${valorDisplay}</p></div></div><div class="flex flex-col items-center justify-center -mt-1 -mr-1 flex-shrink-0"><button data-id="${pedido.id}" data-new-status="${nextStatus}" class="btn-move-status p-1 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-100 ${!nextStatus?'invisible':''}" title="Avançar"><i class='bx bx-chevron-right text-2xl'></i></button><button data-id="${pedido.id}" data-new-status="${prevStatus}" class="btn-move-status p-1 rounded-full text-gray-400 hover:text-orange-600 hover:bg-orange-100 ${!prevStatus?'invisible':''}" title="Retroceder"><i class='bx bx-chevron-left text-2xl'></i></button></div></div></div>`;
 };
 
  const renderCard = (pedido) => {
    // Código completo da função renderCard
-   if (!pedido || !pedido.vendedorResponsavel || !pedido.status || !pedido.id) {
-      console.warn("Tentativa de renderizar card inválido:", pedido);
-      return;
-   }
+   if (!pedido || !pedido.vendedorResponsavel || !pedido.status || !pedido.id) { console.warn("Render card inválido:", pedido); return; }
    const cardHTML = createCardHTML(pedido);
    const listSelector = `#vendedorDashboard .client-list[data-vendedor="${pedido.vendedorResponsavel}"][data-status="${pedido.status}"]`;
    let list = document.querySelector(listSelector);
-
-    if (!list) {
-         console.warn(`Lista não encontrada para ${pedido.vendedorResponsavel} / ${pedido.status}. Tentando fallback geral.`);
-         const fallbackListSelector = `#vendedorDashboard .client-list[data-status="${pedido.status}"]`;
-         list = document.querySelector(fallbackListSelector);
-    }
-
-   const existingCard = document.getElementById(pedido.id);
-   if (existingCard) {
-       existingCard.remove();
-   }
-
-   if (list) {
-        const placeholder = list.querySelector('p.text-gray-400');
-        if (placeholder) placeholder.remove();
-
-       list.insertAdjacentHTML('beforeend', cardHTML);
-   } else {
-       console.error(`Falha Crítica: Nenhuma lista encontrada para o status ${pedido.status}. Card ${pedido.id} não exibido.`);
-   }
+    if (!list) { console.warn(`Lista ${listSelector} não encontrada. Tentando fallback.`); const fallbackListSelector = `#vendedorDashboard .client-list[data-status="${pedido.status}"]`; list = document.querySelector(fallbackListSelector); }
+   const existingCard = document.getElementById(pedido.id); if (existingCard) { existingCard.remove(); }
+   if (list) { const placeholder = list.querySelector('p.text-gray-400'); if (placeholder) placeholder.remove(); list.insertAdjacentHTML('beforeend', cardHTML); }
+   else { console.error(`CRÍTICO: Lista ${pedido.status} não encontrada. Card ${pedido.id} perdido.`); }
  };
 
 /* ==================================================================
@@ -382,122 +236,49 @@ LISTENERS DO FIREBASE
 */
 const listenToPedidos = () => {
     // Código completo da função listenToPedidos
-    if (!db) { console.error("DB Firebase não inicializado. Abortando listenToPedidos."); return; }
-    const ref = db.ref('pedidos');
-    initialDataLoaded = false;
-
-    if (vendedorDashboard) {
-        vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>');
-    } else { console.error("Dashboard não encontrado ao iniciar listeners."); return; }
+    if (!db) { console.error("DB Firebase não inicializado."); return; }
+    const ref = db.ref('pedidos'); initialDataLoaded = false;
+    if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>'); }
+    else { console.error("Dashboard não encontrado."); return; }
     allPedidos = {};
-
     ref.once('value', snapshot => {
-        allPedidos = snapshot.val() || {};
-         Object.keys(allPedidos).forEach(key => {
-             if(allPedidos[key]) allPedidos[key].id = key;
-         });
-
-         if (vendedorDashboard) {
-            vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = ''); // Limpa placeholders
-         }
-
-        Object.values(allPedidos).forEach(renderCard); // Renderiza todos
-
-        if(vendedorDashboard){ // Adiciona placeholder às listas vazias
-            vendedorDashboard.querySelectorAll('.client-list').forEach(list => {
-                if(list.children.length === 0){
-                   list.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4">Nenhum pedido neste status.</p>';
-                }
-            });
-        }
-
-        initialDataLoaded = true;
-        console.log(`Carga inicial: ${Object.keys(allPedidos).length} pedidos.`);
-        // showNotification("Pedidos carregados.", "success"); // Opcional
-
-        startIndividualListeners(ref); // Inicia listeners individuais
-
-    }, error => {
-        console.error("Erro na carga inicial (Firebase 'value'):", error);
-        showNotification("Erro grave ao carregar dados. Verifique console e conexão.", "error");
-         if (vendedorDashboard) {
-            vendedorDashboard.innerHTML = '<p class="text-center text-red-500 my-10">Falha ao carregar dados. Tente recarregar.</p>';
-         }
-    });
+        allPedidos = snapshot.val() || {}; Object.keys(allPedidos).forEach(key => { if(allPedidos[key]) allPedidos[key].id = key; });
+        if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = ''); }
+        Object.values(allPedidos).forEach(renderCard);
+        if(vendedorDashboard){ vendedorDashboard.querySelectorAll('.client-list').forEach(list => { if(list.children.length === 0){ list.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } }); }
+        initialDataLoaded = true; console.log(`Carga inicial: ${Object.keys(allPedidos).length} pedidos.`);
+        startIndividualListeners(ref);
+    }, error => { console.error("Erro carga inicial:", error); showNotification("Erro grave carregar dados.", "error"); if (vendedorDashboard) { vendedorDashboard.innerHTML = '<p class="text-center text-red-500 my-10">Falha carregar.</p>'; } });
 };
 
 const startIndividualListeners = (ref) => {
     // Código completo da função startIndividualListeners
-    // Novo pedido
-    ref.orderByChild('createdAt').startAt(Date.now()).on('child_added', snapshot => { // Ouve apenas novos a partir de agora
-    // Removendo startAt para simplicidade no protótipo:
-    // ref.on('child_added', snapshot => { // Ouvir todos os 'child_added'
-        if (!initialDataLoaded) return; // Ignora durante carga inicial
-
-        const pedido = { ...snapshot.val(), id: snapshot.key };
-        if (!allPedidos[pedido.id]) { // Adiciona apenas se realmente novo
-            console.log("Listener 'child_added' detectou novo pedido:", pedido.id);
-            allPedidos[pedido.id] = pedido;
-            renderCard(pedido);
-        } else {
-             // console.log("Listener 'child_added' ignorou pedido já carregado:", pedido.id);
-        }
+    ref.on('child_added', snapshot => {
+        if (!initialDataLoaded) return; const pedido = { ...snapshot.val(), id: snapshot.key };
+        if (!allPedidos[pedido.id]) { console.log("Novo pedido:", pedido.id); allPedidos[pedido.id] = pedido; renderCard(pedido); }
     });
-
-    // Pedido modificado
     ref.on('child_changed', snapshot => {
-        if (!initialDataLoaded) return; // Espera carga inicial
-        const pedido = { ...snapshot.val(), id: snapshot.key };
-        console.log("Listener 'child_changed' detectou:", pedido.id);
-        allPedidos[pedido.id] = pedido; // Atualiza cache
-        renderCard(pedido); // Re-renderiza
-
-        if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedido.id) {
-            openDetailsModal(pedido.id); // Atualiza modal
-        }
+        if (!initialDataLoaded) return; const pedido = { ...snapshot.val(), id: snapshot.key };
+        console.log("Pedido modificado:", pedido.id); allPedidos[pedido.id] = pedido; renderCard(pedido);
+        if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedido.id) { openDetailsModal(pedido.id); }
     });
-
-    // Pedido removido
     ref.on('child_removed', snapshot => {
-         if (!initialDataLoaded) return; // Espera carga inicial
-        const pedidoId = snapshot.key;
-        console.log("Listener 'child_removed' detectou:", pedidoId);
-        delete allPedidos[pedidoId]; // Remove do cache
-        const card = document.getElementById(pedidoId);
-        if (card) {
-            const list = card.parentElement;
-            card.remove(); // Remove da UI
-             if (list && list.children.length === 0) { // Adiciona placeholder se lista ficou vazia
-                list.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4">Nenhum pedido neste status.</p>';
-             }
-        }
-
-        if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedidoId) {
-             detailsModal.classList.add('hidden');
-              showNotification("O pedido que estava aberto foi excluído.", "warning");
-        }
+         if (!initialDataLoaded) return; const pedidoId = snapshot.key; console.log("Pedido removido:", pedidoId); delete allPedidos[pedidoId];
+        const card = document.getElementById(pedidoId); if (card) { const list = card.parentElement; card.remove(); if (list && list.children.length === 0) { list.innerHTML = '<p class="text-center text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } }
+        if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedidoId) { detailsModal.classList.add('hidden'); showNotification("Pedido excluído.", "warning"); }
     });
 };
 
 const loadConfig = async () => {
     // Código completo da função loadConfig
      try {
-        if (!db) throw new Error("Referência do DB Firebase não disponível.");
-        const snapshot = await db.ref('config').once('value');
+        if (!db) throw new Error("DB não disponível."); const snapshot = await db.ref('config').once('value');
         configData = snapshot.val() || { produtos: [] };
-        if (configData.produtos && typeof configData.produtos === 'object' && !Array.isArray(configData.produtos)) {
-            configData.produtos = Object.values(configData.produtos);
-        } else if (!Array.isArray(configData.produtos)) {
-             configData.produtos = [];
-        }
-         // Ordena os produtos alfabeticamente após carregar
-         configData.produtos.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-         console.log("Configuração (produtos) carregada:", configData.produtos.length, "itens.");
-    } catch (error) {
-        console.error("Erro ao carregar configuração /config:", error);
-        showNotification("Erro ao carregar a lista de produtos.", "error");
-        configData = { produtos: [] };
-    }
+        if (configData.produtos && typeof configData.produtos === 'object' && !Array.isArray(configData.produtos)) { configData.produtos = Object.values(configData.produtos); }
+        else if (!Array.isArray(configData.produtos)) { configData.produtos = []; }
+        configData.produtos.sort((a, b) => (a.name || '').localeCompare(b.name || '')); // Ordena
+        console.log("Config carregada:", configData.produtos.length, "produtos.");
+    } catch (error) { console.error("Erro loadConfig:", error); showNotification("Erro carregar produtos.", "error"); configData = { produtos: [] }; }
 };
 
 
@@ -511,20 +292,51 @@ const updatePedidoStatus = async (id, newStatus) => {
     if (!pedido) { showNotification("Erro: Pedido não encontrado.", "error"); return; }
     if (!newStatus || !STATUS_LIST.includes(newStatus)) { showNotification(`Erro: Status "${newStatus || 'vazio'}" inválido.`, "error"); return; }
     if (pedido.status === newStatus) return;
-
     const oldStatus = pedido.status;
-    const logEntry = {
-        timestamp: new Date().toISOString(), user: currentUser.name,
-        description: `Status alterado de "${formatStatus(oldStatus)}" para "${formatStatus(newStatus)}".`,
-        type: 'status'
-    };
+    const logEntry = { timestamp: new Date().toISOString(), user: currentUser.name, description: `Status: ${formatStatus(oldStatus)} -> ${formatStatus(newStatus)}.`, type: 'status' }; // Mais conciso
     try {
          await db.ref(`pedidos/${id}/logs`).push(logEntry);
          await db.ref(`pedidos/${id}`).update({ status: newStatus, lastUpdate: new Date().toISOString() });
-    } catch (error) {
-        console.error("Erro ao atualizar status:", error);
-        showNotification("Falha ao mover pedido.", "error");
+    } catch (error) { console.error("Erro updatePedidoStatus:", error); showNotification("Falha mover pedido.", "error"); }
+};
+
+// ***** DEFINIÇÃO DA FUNÇÃO openNewPedidoModal *****
+const openNewPedidoModal = () => {
+    if (!pedidoForm || !pedidoModal) { console.error("Modal de novo pedido não encontrado."); return; }
+    pedidoForm.reset(); // Limpa o formulário
+    const pedidoIdInput = document.getElementById('pedidoId');
+    if(pedidoIdInput) pedidoIdInput.value = ''; // Limpa ID oculto
+    const modalTitle = document.getElementById('pedidoModalTitle');
+    if(modalTitle) modalTitle.textContent = 'Novo Pedido de Venda'; // Define título
+
+    // Popula dropdown de vendedores
+    const vendedorSelect = document.getElementById('vendedorResponsavel');
+    if (vendedorSelect && vendedores.length > 0) {
+        vendedorSelect.innerHTML = '<option value="">Selecione Vendedor...</option>' + vendedores.map(v =>
+            `<option value="${v.name}" ${currentUser && currentUser.name === v.name ? 'selected' : ''}>${v.name}</option>`
+        ).join('');
+    } else if (vendedorSelect) {
+         vendedorSelect.innerHTML = '<option value="">Erro: Vendedores não carregados</option>';
     }
+
+    // Popula lista de produtos iniciais (checkboxes)
+    const servicosListContainer = document.getElementById('servicosList');
+    if (servicosListContainer && configData.produtos) {
+        if (configData.produtos.length > 0) {
+             servicosListContainer.innerHTML = configData.produtos.map(p => `
+                <label class="flex items-center space-x-2 cursor-pointer p-2 bg-white rounded-md shadow-sm hover:bg-gray-50 border border-gray-200">
+                   <input type="checkbox" value="${p.price}" data-name="${p.name}" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                   <span class="text-sm text-gray-700">${p.name} (${formatCurrency(p.price)})</span>
+                </label>`).join('');
+        } else {
+             servicosListContainer.innerHTML = '<p class="text-gray-500 text-sm col-span-full italic">Nenhum produto cadastrado.</p>';
+        }
+    } else if (servicosListContainer) {
+         servicosListContainer.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro ao carregar produtos.</p>';
+    }
+
+    pedidoModal.classList.remove('hidden'); // Mostra o modal
+    pedidoModal.classList.add('flex');
 };
 
 const saveNewPedido = async (e) => {
@@ -534,205 +346,160 @@ const saveNewPedido = async (e) => {
     const vendedorSelect = document.getElementById('vendedorResponsavel');
     const observacoesInput = document.getElementById('pedidoObservacoes');
     const formButton = pedidoForm ? pedidoForm.querySelector('button[type="submit"]') : null;
-
-    if(formButton) formButton.disabled = true; // Desabilita botão
-
-    const clienteNome = clienteNomeInput ? clienteNomeInput.value.trim() : '';
-    const vendedorResponsavel = vendedorSelect ? vendedorSelect.value : '';
-    const observacoes = observacoesInput ? observacoesInput.value.trim() : '';
-
-    if (!clienteNome || !vendedorResponsavel) {
-         showNotification("Cliente e Vendedor são obrigatórios.", "error");
-         if(formButton) formButton.disabled = false; return; // Reabilita e sai
-    }
-
+    if(formButton) formButton.disabled = true;
+    const clienteNome = clienteNomeInput?.value.trim() || '';
+    const vendedorResponsavel = vendedorSelect?.value || '';
+    const observacoes = observacoesInput?.value.trim() || '';
+    if (!clienteNome || !vendedorResponsavel) { showNotification("Cliente e Vendedor obrigatórios.", "error"); if(formButton) formButton.disabled = false; return; }
     const selectedItensCheckboxes = Array.from(document.querySelectorAll('#servicosList input:checked'));
-    const itens = selectedItensCheckboxes.map(input => ({ name: input.dataset.name, price: parseFloat(input.value) || 0 }));
+    const itens = selectedItensCheckboxes.map(i => ({ name: i.dataset.name, price: parseFloat(i.value) || 0 }));
     const valorTotalInicial = itens.reduce((sum, item) => sum + item.price, 0);
-
-    let pedidoNumero = 1000; // Default
+    let pedidoNumero = 1000;
     try {
          const configRef = db.ref('config/proximoPedido');
-         const { committed, snapshot } = await configRef.transaction(currentValue => (currentValue || 1000) + 1);
-         if (committed && snapshot.val()) { pedidoNumero = snapshot.val(); }
-         else { throw new Error("Falha na transação do número."); }
-    } catch (error) {
-         console.error("Erro ao gerar número pedido:", error);
-         showNotification('Erro ao gerar número. Tente novamente.', 'error');
-         if(formButton) formButton.disabled = false; return;
-    }
-
+         const { committed, snapshot } = await configRef.transaction(curr => (curr || 1000) + 1);
+         if (committed && snapshot.val()) { pedidoNumero = snapshot.val(); } else { throw new Error("Falha transação número."); }
+    } catch (error) { console.error("Erro gerar número:", error); showNotification('Erro gerar número.', 'error'); if(formButton) formButton.disabled = false; return; }
     const timestamp = new Date().toISOString();
-    const pedidoData = {
-      pedidoNumero, clienteNome, vendedorResponsavel, observacoes,
-      agendamento: timestamp, itens, formaPagamento: FORMAS_PAGAMENTO[0],
-      valorTotal: valorTotalInicial, desconto: 0, status: STATUS_LIST[0],
-      createdAt: timestamp, lastUpdate: timestamp,
-      // logs será adicionado depois
-    };
-
+    const pedidoData = { pedidoNumero, clienteNome, vendedorResponsavel, observacoes, agendamento: timestamp, itens, formaPagamento: FORMAS_PAGAMENTO[0], valorTotal: valorTotalInicial, desconto: 0, status: STATUS_LIST[0], createdAt: timestamp, lastUpdate: timestamp };
     try {
-        const newPedidoRef = db.ref('pedidos').push();
-        const pedidoIdFirebase = newPedidoRef.key;
+        const newPedidoRef = db.ref('pedidos').push(); const pedidoIdFirebase = newPedidoRef.key;
         const initialLog = { timestamp, user: currentUser.name, description: 'Pedido criado.', type: 'log' };
-        // Adiciona o log inicial como o primeiro item do nó 'logs'
-        await db.ref(`pedidos/${pedidoIdFirebase}/logs`).push(initialLog);
-        // Define os dados principais do pedido
-        await newPedidoRef.set(pedidoData);
-
-        showNotification(`Pedido #${pedidoNumero} criado!`, 'success');
-        if(pedidoModal) pedidoModal.classList.add('hidden');
-    } catch (error) {
-        console.error("Erro ao salvar pedido:", error);
-        showNotification(`Erro ao salvar: ${error.message}`, 'error');
-    } finally {
-         if(formButton) formButton.disabled = false; // Reabilita sempre
-    }
+        await db.ref(`pedidos/${pedidoIdFirebase}/logs`).push(initialLog); // Salva log
+        await newPedidoRef.set(pedidoData); // Salva dados principais
+        showNotification(`Pedido #${pedidoNumero} criado!`, 'success'); if(pedidoModal) pedidoModal.classList.add('hidden');
+    } catch (error) { console.error("Erro salvar pedido:", error); showNotification(`Erro: ${error.message}`, 'error'); }
+    finally { if(formButton) formButton.disabled = false; }
 };
 
 const saveDetailsAndMaybeAdvance = async (advanceStatus = false) => {
     // Código completo da função saveDetailsAndMaybeAdvance
     const id = document.getElementById('logPedidoId')?.value;
-     if (!id || !allPedidos[id]) { showNotification("Erro: ID do pedido inválido.", "error"); return false; }
-     const pedidoAtual = allPedidos[id];
-     const saveButton = document.getElementById('saveAndNextStatusBtn');
-
-     if(saveButton) saveButton.disabled = true; // Desabilita
-
-     const valorTotalCalculado = calculateDetailsTotal(false); // Calcula
-     const updates = {
-        itens: itensAdicionadosState,
-        formaPagamento: document.getElementById('detailsFormaPagamento')?.value || pedidoAtual.formaPagamento,
-        desconto: parseFloat(document.getElementById('detailsDesconto')?.value) || 0,
-        valorTotal: valorTotalCalculado,
-        lastUpdate: new Date().toISOString()
-     };
-
-     try {
-        await db.ref(`pedidos/${id}`).update(updates); // Salva
-        let notificationMessage = 'Alterações salvas!';
-         if (advanceStatus) { // Se pediu para avançar
-            const currentStatusIndex = STATUS_LIST.indexOf(pedidoAtual.status);
-            const nextStatus = currentStatusIndex < STATUS_LIST.length - 1 ? STATUS_LIST[currentStatusIndex + 1] : null;
-            if (nextStatus) {
-                await updatePedidoStatus(id, nextStatus); // Avança (já salva log)
-                notificationMessage = 'Salvo e status avançado!';
-            } else { notificationMessage = 'Salvo! Já no último status.'; }
-         }
-         showNotification(notificationMessage, 'success');
-        if(detailsModal) detailsModal.classList.add('hidden'); // Fecha
-        return true; // Sucesso
-     } catch (error) {
-         console.error("Erro ao salvar/avançar:", error);
-         showNotification(`Erro ao salvar: ${error.message}`, 'error');
-         return false; // Falha
-     } finally {
-          if(saveButton) saveButton.disabled = false; // Reabilita
-     }
+    if (!id || !allPedidos[id]) { showNotification("Erro: ID inválido.", "error"); return false; }
+    const pedidoAtual = allPedidos[id]; const saveButton = document.getElementById('saveAndNextStatusBtn');
+    if(saveButton) saveButton.disabled = true;
+    const valorTotalCalculado = calculateDetailsTotal(false);
+    const updates = { itens: itensAdicionadosState, formaPagamento: document.getElementById('detailsFormaPagamento')?.value || pedidoAtual.formaPagamento, desconto: parseFloat(document.getElementById('detailsDesconto')?.value) || 0, valorTotal: valorTotalCalculado, lastUpdate: new Date().toISOString() };
+    try {
+        await db.ref(`pedidos/${id}`).update(updates); let notificationMessage = 'Alterações salvas!';
+        if (advanceStatus) {
+            const currentStatusIndex = STATUS_LIST.indexOf(pedidoAtual.status); const nextStatus = currentStatusIndex < STATUS_LIST.length - 1 ? STATUS_LIST[currentStatusIndex + 1] : null;
+            if (nextStatus) { await updatePedidoStatus(id, nextStatus); notificationMessage = 'Salvo e status avançado!'; }
+            else { notificationMessage = 'Salvo! Último status.'; }
+        }
+        showNotification(notificationMessage, 'success'); if(detailsModal) detailsModal.classList.add('hidden'); return true;
+    } catch (error) { console.error("Erro salvar/avançar:", error); showNotification(`Erro: ${error.message}`, 'error'); return false; }
+    finally { if(saveButton) saveButton.disabled = false; }
 };
 
 const saveLogAndUploads = async (e) => {
     // Código completo da função saveLogAndUploads
-   e.preventDefault();
-    const submitBtn = e.target.querySelector('button[type="submit"]');
-    if (!submitBtn) return;
-    const pedidoId = document.getElementById('logPedidoId')?.value;
-    const descriptionInput = document.getElementById('logDescricao');
-    const description = descriptionInput ? descriptionInput.value.trim() : '';
-    if (!pedidoId) { showNotification("Erro: ID do pedido não encontrado.", "error"); return; }
-    if (!description && filesToUpload.length === 0) { showNotification("Digite descrição ou selecione arquivos.", "warning"); return; }
-
+   e.preventDefault(); const submitBtn = e.target.querySelector('button[type="submit"]'); if (!submitBtn) return;
+    const pedidoId = document.getElementById('logPedidoId')?.value; const descriptionInput = document.getElementById('logDescricao');
+    const description = descriptionInput?.value.trim() || '';
+    if (!pedidoId) { showNotification("Erro: ID pedido.", "error"); return; }
+    if (!description && filesToUpload.length === 0) { showNotification("Descrição ou arquivos.", "warning"); return; }
     submitBtn.disabled = true; submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin mr-2'></i> Salvando...`;
-    const timestamp = new Date().toISOString();
-    const logEntry = { timestamp, user: currentUser.name, type: 'log',
-        description: description || `Adicionou ${filesToUpload.length} mídia(s).` };
-
+    const timestamp = new Date().toISOString(); const logEntry = { timestamp, user: currentUser.name, type: 'log', description: description || `Adicionou ${filesToUpload.length} mídia(s).` };
     try {
-        await db.ref(`pedidos/${pedidoId}/logs`).push(logEntry); // Salva log
-        if (filesToUpload.length > 0) { // Processa uploads
+        await db.ref(`pedidos/${pedidoId}/logs`).push(logEntry);
+        if (filesToUpload.length > 0) {
             submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin mr-2'></i> Enviando ${filesToUpload.length} mídia(s)...`;
-            const uploadPromises = filesToUpload.map(async file => {
-                const url = await uploadFileToCloudinary(file);
-                return { type: file.type || 'application/octet-stream', url, name: file.name, timestamp };
-            });
-            const mediaResults = await Promise.all(uploadPromises);
-            const mediaRef = db.ref(`pedidos/${pedidoId}/media`);
-            for (const result of mediaResults) { await mediaRef.push().set(result); } // Salva refs da mídia
+            const uploadPromises = filesToUpload.map(async file => { const url = await uploadFileToCloudinary(file); return { type: file.type || 'application/octet-stream', url, name: file.name, timestamp }; });
+            const mediaResults = await Promise.all(uploadPromises); const mediaRef = db.ref(`pedidos/${pedidoId}/media`);
+            for (const result of mediaResults) { await mediaRef.push().set(result); }
         }
-        if(logForm) logForm.reset(); filesToUpload = []; if(fileNameDisplay) fileNameDisplay.textContent = ''; // Limpa
-        showNotification('Atualização adicionada!', 'success');
-    } catch (error) {
-         if (!error.message || !error.message.includes('upload')) { showNotification(`Erro: ${error.message || 'Erro desconhecido'}`, 'error'); }
-         console.error("Erro em saveLogAndUploads:", error);
-    } finally {
-        submitBtn.disabled = false; submitBtn.innerHTML = `<i class='bx bx-message-square-add mr-2'></i> Adicionar ao Histórico`;
-    }
+        if(logForm) logForm.reset(); filesToUpload = []; if(fileNameDisplay) fileNameDisplay.textContent = ''; showNotification('Atualização adicionada!', 'success');
+    } catch (error) { if (!error.message?.includes('upload')) { showNotification(`Erro: ${error.message || 'Erro desconhecido'}`, 'error'); } console.error("Erro saveLogAndUploads:", error); }
+    finally { submitBtn.disabled = false; submitBtn.innerHTML = `<i class='bx bx-message-square-add mr-2'></i> Adicionar ao Histórico`; }
 };
 
-// --- Funções do Modal de Detalhes (renderTimeline, renderMediaGallery, openLightbox, etc.) ---
-// --- Estas funções permanecem EXATAMENTE como na resposta anterior ---
-// --- Vou incluí-las aqui na íntegra para garantir ---
 
-const renderTimeline = (pedido) => {
-   const timelineContainer = document.getElementById('timelineContainer');
-    if (!timelineContainer) { console.warn("Elemento timelineContainer não encontrado."); return; }
+/* ==================================================================
+MODAL DE DETALHES - Funções Internas
+==================================================================
+*/
+const openDetailsModal = (id) => { /* ... código completo ... */
+    // Código completo da função openDetailsModal
+    const pedido = allPedidos[id];
+    if (!pedido) { showNotification("Erro: Pedido não encontrado.", "error"); return; }
+    if(!detailsModal) return;
+    detailsModal.scrollTop = 0; if(logForm) logForm.reset();
+    const logPedidoIdInput = document.getElementById('logPedidoId'); if(logPedidoIdInput) logPedidoIdInput.value = id;
+    filesToUpload = []; if(fileNameDisplay) fileNameDisplay.textContent = '';
+    const detailsClienteNome = document.getElementById('detailsClienteNome'); if(detailsClienteNome) detailsClienteNome.textContent = pedido.clienteNome || 'Cliente não informado';
+    const detailsPedidoNumero = document.getElementById('detailsPedidoNumero'); if(detailsPedidoNumero) detailsPedidoNumero.textContent = `Pedido #${String(pedido.pedidoNumero || 'N/A').padStart(4, '0')}`;
+    const detailsAgendamento = document.getElementById('detailsAgendamento'); if(detailsAgendamento) detailsAgendamento.textContent = `Aberto em: ${formatDateTime(pedido.createdAt || pedido.agendamento)}`;
+    const detailsVendedor = document.getElementById('detailsVendedor'); if(detailsVendedor) detailsVendedor.textContent = `Vendedor: ${pedido.vendedorResponsavel || 'N/A'}`;
+    const observacoesContainer = document.getElementById('detailsObservacoesContainer');
+    if(observacoesContainer){ if (pedido.observacoes) { observacoesContainer.innerHTML = `<h4 class="text-sm font-semibold text-gray-500 mb-1">Obs. Iniciais:</h4><p class="text-gray-800 bg-yellow-50 border border-yellow-200 p-3 rounded-md whitespace-pre-wrap text-sm">${pedido.observacoes}</p>`; observacoesContainer.classList.remove('hidden'); } else { observacoesContainer.innerHTML = ''; observacoesContainer.classList.add('hidden'); } }
+    const formaPagamentoSelect = document.getElementById('detailsFormaPagamento'); if(formaPagamentoSelect){ formaPagamentoSelect.innerHTML = FORMAS_PAGAMENTO.map(f => `<option value="${f}" ${f === pedido.formaPagamento ? 'selected' : ''}>${f}</option>`).join(''); }
+    const descontoInput = document.getElementById('detailsDesconto'); if(descontoInput) descontoInput.value = pedido.desconto || 0;
+    const detailsServicosList = document.getElementById('detailsServicosList'); if(detailsServicosList && configData.produtos){ detailsServicosList.innerHTML = '<option value="">-- Adicionar Item --</option>' + configData.produtos.map(p => `<option value="${p.name}|${p.price}">${p.name} - ${formatCurrency(p.price)}</option>`).join(''); } else if(detailsServicosList){ detailsServicosList.innerHTML = '<option value="">-- Erro --</option>'; }
+    itensAdicionadosState = Array.isArray(pedido.itens) ? [...pedido.itens] : [];
+    renderDetailsItems(); calculateDetailsTotal(false); renderTimeline(pedido); renderMediaGallery(pedido);
+    if(deleteBtn) { deleteBtn.classList.toggle('hidden', !(currentUser?.role?.toLowerCase().includes('gestor'))); deleteBtn.dataset.id = id; }
+    detailsModal.classList.remove('hidden'); detailsModal.classList.add('flex');
+};
+const renderDetailsItems = () => { /* ... código completo ... */
+    // Código completo da função renderDetailsItems
+     const container = document.getElementById('detailsItensContainer'); if (!container) return;
+    const itens = Array.isArray(itensAdicionadosState) ? itensAdicionadosState : [];
+    if (itens.length === 0) { container.innerHTML = '<p class="text-gray-500 text-sm italic">Nenhum item.</p>'; return; }
+    container.innerHTML = itens.map((item, index) => `<div class="flex justify-between items-center bg-gray-50 p-2 rounded text-sm border border-gray-200 shadow-sm mb-1"><span>${item.name || 'Item s/ nome'} - ${formatCurrency(item.price)}</span><button type="button" class="remove-item-btn text-red-500 hover:text-red-700 font-bold px-2 text-lg leading-none" data-index="${index}" title="Remover">&times;</button></div>`).join('');
+};
+const calculateDetailsTotal = (saveToDB = false) => { /* ... código completo ... */
+    // Código completo da função calculateDetailsTotal
+     const itens = Array.isArray(itensAdicionadosState) ? itensAdicionadosState : []; const itensTotal = itens.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
+    const descontoInput = document.getElementById('detailsDesconto'); const desconto = parseFloat(descontoInput?.value || 0) || 0; const total = Math.max(0, itensTotal - desconto);
+    const totalDisplay = document.getElementById('detailsValorTotalDisplay'); if(totalDisplay) totalDisplay.textContent = formatCurrency(total);
+    if (saveToDB) { const id = document.getElementById('logPedidoId')?.value; if (id && allPedidos[id]) { const valorAtualDB = allPedidos[id].valorTotal; if (formatCurrency(valorAtualDB) !== formatCurrency(total)) { console.log(`Atualizando DB ${id}: ${formatCurrency(total)}`); db.ref(`pedidos/${id}/valorTotal`).set(total).catch(error => { console.error("Erro salvar total:", error); showNotification("Erro atualizar total.", "error"); }); } } }
+     return total;
+};
+const renderTimeline = (pedido) => { /* ... código completo ... */
+    // Código completo da função renderTimeline
+   const timelineContainer = document.getElementById('timelineContainer'); if (!timelineContainer) return;
     const logs = pedido.logs ? Object.entries(pedido.logs).map(([key, value]) => ({ ...value, id: key })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) : [];
-    if (logs.length === 0) { timelineContainer.innerHTML = '<p class="text-gray-500 text-center py-4 text-sm italic">Nenhum histórico registrado.</p>'; return; }
-    timelineContainer.innerHTML = logs.map(log => {
-         const iconClass = log.type === 'status' ? 'bx-transfer' : 'bx-message-detail';
-         const iconColor = log.type === 'status' ? 'text-green-600 border-green-500' : 'text-blue-600 border-blue-500';
-         const userDisplay = log.user || 'Sistema';
-         return `<div class="timeline-item ${log.type === 'status' ? 'timeline-item-status' : 'timeline-item-log'}"><div class="timeline-icon ${iconColor}"><i class='bx ${iconClass}'></i></div><div class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 ml-2 relative"><div class="flex justify-between items-start mb-1 gap-2"><h4 class="font-semibold text-gray-700 text-sm flex-grow">${userDisplay}</h4><span class="text-xs text-gray-500 flex-shrink-0">${formatDateTime(log.timestamp)}</span></div><p class="text-gray-600 text-sm break-words">${log.description || '(Sem descrição)'}</p></div></div>`;
-    }).join('');
+    if (logs.length === 0) { timelineContainer.innerHTML = '<p class="text-gray-500 text-center py-4 text-sm italic">Nenhum histórico.</p>'; return; }
+    timelineContainer.innerHTML = logs.map(log => { const iconClass = log.type === 'status' ? 'bx-transfer' : 'bx-message-detail'; const iconColor = log.type === 'status' ? 'text-green-600 border-green-500' : 'text-blue-600 border-blue-500'; const userDisplay = log.user || 'Sistema';
+         return `<div class="timeline-item ${log.type === 'status' ? 'timeline-item-status' : 'timeline-item-log'}"><div class="timeline-icon ${iconColor}"><i class='bx ${iconClass}'></i></div><div class="bg-white p-3 rounded-lg shadow-sm border border-gray-200 ml-2 relative"><div class="flex justify-between items-start mb-1 gap-2"><h4 class="font-semibold text-gray-700 text-sm flex-grow">${userDisplay}</h4><span class="text-xs text-gray-500 flex-shrink-0">${formatDateTime(log.timestamp)}</span></div><p class="text-gray-600 text-sm break-words">${log.description || '(S/ Desc.)'}</p></div></div>`; }).join('');
 };
-
-const renderMediaGallery = (pedido) => {
-    const thumbnailGrid = document.getElementById('thumbnail-grid');
-    if(!thumbnailGrid) { console.warn("Elemento thumbnail-grid não encontrado."); return; }
-    const media = pedido.media || {};
-    const mediaEntries = Object.entries(media).map(([key, item]) => ({ ...item, key: key }));
-    lightboxMedia = mediaEntries;
+const renderMediaGallery = (pedido) => { /* ... código completo ... */
+    // Código completo da função renderMediaGallery
+    const thumbnailGrid = document.getElementById('thumbnail-grid'); if(!thumbnailGrid) return;
+    const media = pedido.media || {}; const mediaEntries = Object.entries(media).map(([key, item]) => ({ ...item, key: key })); lightboxMedia = mediaEntries;
     if (mediaEntries.length === 0) { thumbnailGrid.innerHTML = `<div class="col-span-full text-center py-6 text-gray-400"><i class='bx bx-image bx-sm mb-2'></i><p class="text-xs italic">Nenhuma mídia.</p></div>`; return; }
-    thumbnailGrid.innerHTML = mediaEntries.map((item, index) => {
-        if (!item || !item.url) return '';
-        const canDelete = currentUser?.role?.toLowerCase().includes('gestor');
-        const deleteButtonHTML = canDelete ? `<button class="delete-media-btn z-10" data-pedido-id="${pedido.id}" data-media-key="${item.key}" title="Excluir"><i class='bx bxs-trash bx-xs'></i></button>` : '';
-        const fileType = item.type || ''; const isImage = fileType.startsWith('image/'); const isVideo = fileType.startsWith('video/'); const isPdf = fileType === 'application/pdf';
-        const fileName = item.name || `Arquivo_${index + 1}`;
-        let thumbnailContent;
+    thumbnailGrid.innerHTML = mediaEntries.map((item, index) => { if (!item?.url) return ''; const canDelete = currentUser?.role?.toLowerCase().includes('gestor'); const deleteButtonHTML = canDelete ? `<button class="delete-media-btn z-10" data-pedido-id="${pedido.id}" data-media-key="${item.key}" title="Excluir"><i class='bx bxs-trash bx-xs'></i></button>` : ''; const fileType = item.type || ''; const isImage = fileType.startsWith('image/'); const isVideo = fileType.startsWith('video/'); const isPdf = fileType === 'application/pdf'; const fileName = item.name || `Arquivo_${index + 1}`; let thumbnailContent;
         if (isImage) { thumbnailContent = `<img src="${item.url}" alt="${fileName}" loading="lazy" class="absolute inset-0 w-full h-full object-cover transition-transform duration-200 group-hover:scale-105">`; }
         else if (isVideo) { thumbnailContent = `<div class="flex flex-col items-center justify-center h-full p-1 text-center"><i class='bx bx-play-circle text-3xl text-blue-500'></i><span class="text-xs text-gray-600 mt-1 truncate w-full px-1" title="${fileName}">${fileName}</span></div>`; }
         else if (isPdf) { thumbnailContent = `<div class="flex flex-col items-center justify-center h-full p-1 text-center"><i class='bx bxs-file-pdf text-3xl text-red-500'></i><span class="text-xs text-gray-600 mt-1 truncate w-full px-1" title="${fileName}">${fileName}</span></div>`; }
         else { thumbnailContent = `<div class="flex flex-col items-center justify-center h-full p-1 text-center"><i class='bx bx-file text-3xl text-gray-400'></i><span class="text-xs text-gray-500 mt-1 truncate w-full px-1" title="${fileName}">${fileName}</span></div>`; }
-        return `<div class="thumbnail-container group bg-gray-100 rounded-md overflow-hidden flex items-center justify-center relative border border-gray-300 hover:shadow-lg transition-shadow aspect-square">${deleteButtonHTML}<div class="thumbnail-item w-full h-full cursor-pointer flex items-center justify-center relative" data-index="${index}">${thumbnailContent}</div></div>`;
-    }).join('');
+        return `<div class="thumbnail-container group bg-gray-100 rounded-md overflow-hidden flex items-center justify-center relative border border-gray-300 hover:shadow-lg transition-shadow aspect-square">${deleteButtonHTML}<div class="thumbnail-item w-full h-full cursor-pointer flex items-center justify-center relative" data-index="${index}">${thumbnailContent}</div></div>`; }).join('');
 };
-
-const openLightbox = (index) => {
-    if (!lightboxMedia || index < 0 || index >= lightboxMedia.length) { console.warn("Índice lightbox inválido:", index); return; }
-    currentLightboxIndex = index; const media = lightboxMedia[index];
-    if (!media || !media.url) { console.warn("Mídia inválida:", index, media); showNotification("Não foi possível abrir.", "error"); return; }
-    const lightboxContent = document.getElementById('lightbox-content'); if(!lightboxContent) return;
-    lightboxContent.innerHTML = '<p class="text-white animate-pulse text-center">Carregando...</p>';
+const openLightbox = (index) => { /* ... código completo ... */
+    // Código completo da função openLightbox
+    if (!lightboxMedia || index < 0 || index >= lightboxMedia.length) { console.warn("Índice lightbox inválido:", index); return; } currentLightboxIndex = index; const media = lightboxMedia[index]; if (!media?.url) { console.warn("Mídia inválida:", index, media); showNotification("Não foi possível abrir.", "error"); return; } const lightboxContent = document.getElementById('lightbox-content'); if(!lightboxContent) return; lightboxContent.innerHTML = '<p class="text-white animate-pulse text-center">Carregando...</p>';
     if (media.type === 'application/pdf') { lightboxContent.innerHTML = `<div class="text-center p-6 bg-gray-800 rounded"><i class='bx bxs-file-pdf text-6xl text-red-400 mb-4'></i><p class="text-gray-300 text-sm mb-4 break-all">${media.name || 'PDF'}</p><a href="${media.url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-red-600 text-white px-5 py-2 rounded hover:bg-red-700 transition-colors"><i class='bx bx-link-external'></i>Abrir PDF</a></div>`; }
-    else if (media.type?.startsWith('image/')) { const img = new Image(); img.onload = () => { lightboxContent.innerHTML = ''; lightboxContent.appendChild(img); }; img.onerror = () => { lightboxContent.innerHTML = '<p class="text-red-400 text-center">Erro ao carregar.</p>'; }; img.src = media.url; img.alt = media.name || 'Imagem'; img.className = "block max-w-full max-h-full object-contain rounded shadow-lg"; }
+    else if (media.type?.startsWith('image/')) { const img = new Image(); img.onload = () => { lightboxContent.innerHTML = ''; lightboxContent.appendChild(img); }; img.onerror = () => { lightboxContent.innerHTML = '<p class="text-red-400 text-center">Erro carregar.</p>'; }; img.src = media.url; img.alt = media.name || 'Imagem'; img.className = "block max-w-full max-h-full object-contain rounded shadow-lg"; }
     else if (media.type?.startsWith('video/')) { lightboxContent.innerHTML = `<video src="${media.url}" controls controlsList="nodownload" class="block max-w-full max-h-full rounded shadow-lg"></video>`; }
     else { lightboxContent.innerHTML = `<div class="text-center p-6 bg-gray-800 rounded"><i class='bx bx-file text-6xl text-gray-400 mb-4'></i><p class="text-gray-300 text-sm mb-4 break-all">${media.name || 'Arquivo'}</p><a href="${media.url}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2 rounded hover:bg-blue-700 transition-colors"><i class='bx bx-download'></i>Abrir/Baixar</a></div>`; }
     if(lightbox){ lightbox.classList.remove('hidden'); lightbox.classList.add('flex'); }
 };
 
+
 /* ==================================================================
 MODAL DE CONFIGURAÇÃO - Funções
 ==================================================================
 */
+// ***** DEFINIÇÃO DA FUNÇÃO openConfigModal *****
 const openConfigModal = () => {
     // Código completo da função openConfigModal
-    renderConfigLists();
+    renderConfigLists(); // Atualiza a lista de produtos antes de mostrar
      if(configModal){
-        configModal.classList.remove('hidden');
-        configModal.classList.add('flex');
+        configModal.classList.remove('hidden'); // Remove a classe que esconde
+        configModal.classList.add('flex'); // Adiciona classe que mostra (usando flexbox para centralizar)
      } else {
-         console.error("Modal de configuração não encontrado.");
+         console.error("Modal de configuração não encontrado no DOM.");
      }
 };
 const renderConfigLists = () => {
@@ -740,37 +507,25 @@ const renderConfigLists = () => {
    const servicosListContainer = document.getElementById('configServicosList');
     if (!servicosListContainer) { console.warn("Elemento configServicosList não encontrado."); return; }
     const produtos = Array.isArray(configData.produtos) ? configData.produtos : [];
-     if (produtos.length === 0) { servicosListContainer.innerHTML = '<p class="text-gray-500 text-sm text-center italic p-4">Nenhum produto cadastrado.</p>'; return; }
-     produtos.sort((a, b) => (a.name || '').localeCompare(b.name || '')); // Ordena
+     if (produtos.length === 0) { servicosListContainer.innerHTML = '<p class="text-gray-500 text-sm text-center italic p-4">Nenhum produto.</p>'; return; }
+     produtos.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     servicosListContainer.innerHTML = produtos.map((p, i) => `
       <div class="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm mb-2 transition-colors hover:bg-gray-50">
         <span class="text-sm text-gray-800 flex-grow mr-2">${p.name} - ${formatCurrency(p.price)}</span>
-        <button class="remove-servico-btn text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 text-xl leading-none flex-shrink-0" data-index="${i}" title="Excluir Produto">&times;</button>
+        <button class="remove-servico-btn text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 text-xl leading-none flex-shrink-0" data-index="${i}" title="Excluir">&times;</button>
       </div>`).join('');
 };
 const addProdutoConfig = async (e) => {
     // Código completo da função addProdutoConfig
-    e.preventDefault();
-    const nameInput = document.getElementById('newServicoName');
-    const priceInput = document.getElementById('newServicoPrice');
-    const addButton = e.target.querySelector('button[type="submit"]');
-    const name = nameInput ? nameInput.value.trim() : '';
-    const price = priceInput ? parseFloat(priceInput.value) : 0;
-    if (!name || isNaN(price) || price <= 0) { showNotification("Nome e preço (> 0) são obrigatórios.", "error"); return; }
+    e.preventDefault(); const nameInput = document.getElementById('newServicoName'); const priceInput = document.getElementById('newServicoPrice'); const addButton = e.target.querySelector('button[type="submit"]'); const name = nameInput?.value.trim() || ''; const price = parseFloat(priceInput?.value || 0);
+    if (!name || isNaN(price) || price <= 0) { showNotification("Nome e preço (> 0) obrigatórios.", "error"); return; }
     if (!Array.isArray(configData.produtos)) configData.produtos = [];
-    const exists = configData.produtos.some(p => p.name.toLowerCase() === name.toLowerCase());
-    if (exists) { showNotification(`Produto "${name}" já existe.`, "error"); return; }
-    if(addButton) addButton.disabled = true;
-    const newProduct = { name, price };
-    const tentativeProductList = [...configData.produtos, newProduct];
+    const exists = configData.produtos.some(p => p.name.toLowerCase() === name.toLowerCase()); if (exists) { showNotification(`"${name}" já existe.`, "error"); return; }
+    if(addButton) addButton.disabled = true; const newProduct = { name, price }; const tentativeProductList = [...configData.produtos, newProduct];
     try {
-        await db.ref('config/produtos').set(tentativeProductList);
-        configData.produtos = tentativeProductList;
-        renderConfigLists();
-        if(nameInput) nameInput.value = ''; if(priceInput) priceInput.value = '';
-        showNotification(`"${name}" adicionado!`, "success");
-    } catch (error) { console.error("Erro ao salvar produto:", error); showNotification("Erro ao salvar.", "error"); }
-    finally { if(addButton) addButton.disabled = false; }
+        await db.ref('config/produtos').set(tentativeProductList); configData.produtos = tentativeProductList; renderConfigLists();
+        if(nameInput) nameInput.value = ''; if(priceInput) priceInput.value = ''; showNotification(`"${name}" adicionado!`, "success");
+    } catch (error) { console.error("Erro salvar produto:", error); showNotification("Erro ao salvar.", "error"); } finally { if(addButton) addButton.disabled = false; }
 };
 const removeProdutoConfig = async (e) => {
     // Código completo da função removeProdutoConfig
@@ -779,14 +534,9 @@ const removeProdutoConfig = async (e) => {
         if (!isNaN(index) && configData.produtos?.[index]) {
              const produtoParaRemover = configData.produtos[index];
             if (confirm(`Remover "${produtoParaRemover.name}"?`)) {
-                const produtosAtualizados = configData.produtos.filter((_, i) => i !== index);
-                e.target.disabled = true; // Desabilita botão
-                try {
-                    await db.ref('config/produtos').set(produtosAtualizados);
-                    configData.produtos = produtosAtualizados;
-                    renderConfigLists();
-                    showNotification(`"${produtoParaRemover.name}" removido.`, "success");
-                } catch (error) { console.error("Erro ao remover:", error); showNotification("Erro.", "error"); e.target.disabled = false; } // Reabilita se falhar
+                const produtosAtualizados = configData.produtos.filter((_, i) => i !== index); e.target.disabled = true;
+                try { await db.ref('config/produtos').set(produtosAtualizados); configData.produtos = produtosAtualizados; renderConfigLists(); showNotification(`"${produtoParaRemover.name}" removido.`, "success"); }
+                catch (error) { console.error("Erro remover:", error); showNotification("Erro.", "error"); e.target.disabled = false; }
             }
         }
     }
@@ -798,14 +548,11 @@ BUSCA GLOBAL
 */
 const handleGlobalSearch = () => {
     // Código completo da função handleGlobalSearch
-    if(!globalSearchInput || !globalSearchResults) { console.warn("Elementos de busca não encontrados."); return; }
-    const searchTerm = globalSearchInput.value.toLowerCase().trim();
+    if(!globalSearchInput || !globalSearchResults) { console.warn("Busca não encontrada."); return; } const searchTerm = globalSearchInput.value.toLowerCase().trim();
      if (!searchTerm) { globalSearchResults.innerHTML = ''; globalSearchResults.classList.add('hidden'); return; }
     const results = Object.values(allPedidos).filter(p => (p.clienteNome&&p.clienteNome.toLowerCase().includes(searchTerm)) || (p.pedidoNumero&&String(p.pedidoNumero).includes(searchTerm)) || (p.id&&p.id.toLowerCase().includes(searchTerm.replace('#',''))) || (Array.isArray(p.itens)&&p.itens.some(i=>i.name&&i.name.toLowerCase().includes(searchTerm))) || (p.vendedorResponsavel&&p.vendedorResponsavel.toLowerCase().includes(searchTerm)) ).sort((a,b)=>new Date(b.lastUpdate||b.createdAt||0)-new Date(a.lastUpdate||a.createdAt||0)).slice(0,10);
-     if (results.length > 0) {
-         globalSearchResults.innerHTML = results.map(p => `<div class="search-result-item p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 transition-colors" data-id="${p.id}"><p class="font-semibold text-sm text-gray-800 truncate">${p.clienteNome||'Cliente'} (#${p.pedidoNumero||p.id.slice(-5)})</p><p class="text-xs text-gray-500">${p.vendedorResponsavel||'N/A'} - <span class="font-medium ${p.status==='Entregue'?'text-green-600':'text-blue-600'}">${formatStatus(p.status)}</span></p></div>`).join('');
-         globalSearchResults.classList.remove('hidden');
-     } else { globalSearchResults.innerHTML = '<p class="p-3 text-center text-sm text-gray-500 italic">Nenhum pedido encontrado.</p>'; globalSearchResults.classList.remove('hidden'); }
+     if (results.length > 0) { globalSearchResults.innerHTML = results.map(p => `<div class="search-result-item p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 transition-colors" data-id="${p.id}"><p class="font-semibold text-sm text-gray-800 truncate">${p.clienteNome||'Cliente'} (#${p.pedidoNumero||p.id.slice(-5)})</p><p class="text-xs text-gray-500">${p.vendedorResponsavel||'N/A'} - <span class="font-medium ${p.status==='Entregue'?'text-green-600':'text-blue-600'}">${formatStatus(p.status)}</span></p></div>`).join(''); globalSearchResults.classList.remove('hidden'); }
+     else { globalSearchResults.innerHTML = '<p class="p-3 text-center text-sm text-gray-500 italic">Nenhum pedido encontrado.</p>'; globalSearchResults.classList.remove('hidden'); }
 };
 
 /* ==================================================================
@@ -814,224 +561,59 @@ CONFIGURAÇÃO DOS LISTENERS DE EVENTOS GERAIS
 */
 const setupEventListeners = () => {
     // Código completo da função setupEventListeners
-   console.log("Configurando listeners de eventos...");
+   console.log("Configurando listeners...");
 
     // --- Login / Logout ---
-    if (userList) {
-        userList.addEventListener('click', (e) => {
-            const userBtn = e.target.closest('.user-btn');
-            if (userBtn && userBtn.dataset.user) {
-                try {
-                   const userData = JSON.parse(userBtn.dataset.user.replace(/&apos;/g, "'"));
-                   loginUser(userData);
-                } catch(err){ console.error("Erro no JSON do botão de usuário:", err, userBtn.dataset.user); }
-            }
-        });
-    } else { console.warn("Elemento userList não encontrado."); }
-
-    if (logoutButton) {
-        logoutButton.addEventListener('click', () => {
-            localStorage.removeItem('eletroIAUser');
-            try { if (db) db.ref('pedidos').off(); console.log("Listener 'pedidos' desligado."); } // Verifica db
-            catch(e) { console.warn("Erro ao desligar listener 'pedidos':", e); }
-            location.reload();
-        });
-    } else { console.warn("Botão logoutButton não encontrado."); }
+    if (userList) { userList.addEventListener('click', (e) => { const userBtn = e.target.closest('.user-btn'); if (userBtn?.dataset.user) { try { loginUser(JSON.parse(userBtn.dataset.user.replace(/&apos;/g, "'"))); } catch(err){ console.error("Erro JSON user:", err); } } }); } else { console.warn("userList não encontrado."); }
+    if (logoutButton) { logoutButton.addEventListener('click', () => { localStorage.removeItem('eletroIAUser'); try { if (db) db.ref('pedidos').off(); } catch(e) { console.warn("Erro desligar listener:", e); } location.reload(); }); } else { console.warn("logoutButton não encontrado."); }
 
     // --- Abrir Modais Principais ---
-    if(addPedidoBtn) addPedidoBtn.addEventListener('click', openNewPedidoModal); else { console.warn("Botão addPedidoBtn não encontrado."); }
-    if(configBtn) configBtn.addEventListener('click', openConfigModal); else { console.warn("Botão configBtn não encontrado."); }
+    if(addPedidoBtn) addPedidoBtn.addEventListener('click', openNewPedidoModal); else { console.warn("addPedidoBtn não encontrado."); } // ***** CORREÇÃO AQUI *****
+    if(configBtn) configBtn.addEventListener('click', openConfigModal); else { console.warn("configBtn não encontrado."); } // ***** CORREÇÃO AQUI *****
 
     // --- Salvar Formulários Principais ---
-    if(pedidoForm) pedidoForm.addEventListener('submit', saveNewPedido); else { console.warn("Formulário pedidoForm não encontrado."); }
-    const addServicoForm = document.getElementById('addServicoForm');
-    if(addServicoForm) addServicoForm.addEventListener('submit', addProdutoConfig); else { console.warn("Formulário addServicoForm não encontrado."); }
+    if(pedidoForm) pedidoForm.addEventListener('submit', saveNewPedido); else { console.warn("pedidoForm não encontrado."); }
+    const addServicoForm = document.getElementById('addServicoForm'); if(addServicoForm) addServicoForm.addEventListener('submit', addProdutoConfig); else { console.warn("addServicoForm não encontrado."); }
 
     // --- Fechar Modais (Genérico) ---
-    document.body.addEventListener('click', (e) => {
-        if (e.target.closest('.btn-close-modal')) {
-            const modal = e.target.closest('.modal-backdrop');
-            if (modal) modal.classList.add('hidden');
-        }
-        else if (e.target.classList.contains('modal-backdrop') && e.target.id !== 'lightbox') {
-             e.target.classList.add('hidden');
-        }
-    });
-     // Fechar Lightbox
-     const lightboxCloseBtn = document.getElementById('lightbox-close');
-     if(lightboxCloseBtn) lightboxCloseBtn.addEventListener('click', () => { if(lightbox) lightbox.classList.add('hidden'); });
-     const lightboxCloseBg = document.getElementById('lightbox-close-bg');
-     if(lightboxCloseBg) lightboxCloseBg.addEventListener('click', () => { if(lightbox) lightbox.classList.add('hidden'); });
+    document.body.addEventListener('click', (e) => { if (e.target.closest('.btn-close-modal')) { e.target.closest('.modal-backdrop')?.classList.add('hidden'); } else if (e.target.classList.contains('modal-backdrop') && e.target.id !== 'lightbox') { e.target.classList.add('hidden'); } });
+    if(lightboxClose) lightboxClose.addEventListener('click', () => { if(lightbox) lightbox.classList.add('hidden'); }); const lightboxCloseBg = document.getElementById('lightbox-close-bg'); if(lightboxCloseBg) lightboxCloseBg.addEventListener('click', () => { if(lightbox) lightbox.classList.add('hidden'); });
 
     // --- Ações no Kanban ---
-    if (vendedorDashboard) {
-        vendedorDashboard.addEventListener('click', (e) => {
-            const moveBtn = e.target.closest('.btn-move-status');
-            const cardArea = e.target.closest('.card-clickable-area');
-            if (moveBtn && moveBtn.dataset.id && moveBtn.dataset.newStatus) {
-              e.stopPropagation();
-              updatePedidoStatus(moveBtn.dataset.id, moveBtn.dataset.newStatus);
-            } else if (cardArea) {
-              const card = e.target.closest('.vehicle-card');
-              if (card && card.dataset.id) openDetailsModal(card.dataset.id);
-            }
-        });
-    } else { console.warn("Elemento vendedorDashboard não encontrado para listeners Kanban."); }
+    if (vendedorDashboard) { vendedorDashboard.addEventListener('click', (e) => { const moveBtn = e.target.closest('.btn-move-status'); const cardArea = e.target.closest('.card-clickable-area'); if (moveBtn?.dataset.id && moveBtn.dataset.newStatus) { e.stopPropagation(); updatePedidoStatus(moveBtn.dataset.id, moveBtn.dataset.newStatus); } else if (cardArea) { const card = e.target.closest('.vehicle-card'); if (card?.dataset.id) openDetailsModal(card.dataset.id); } }); } else { console.warn("vendedorDashboard não encontrado."); }
 
     // --- Ações no Modal de Detalhes ---
-    if(detailsModal){
-         detailsModal.addEventListener('click', (e) => {
-            // Adicionar Item
-            if (e.target.id === 'detailsAddServicoBtn') {
-                const select = document.getElementById('detailsServicosList');
-                if (select && select.value) {
-                    const [name, priceStr] = select.value.split('|');
-                    const price = parseFloat(priceStr);
-                    if(name && !isNaN(price)){
-                        itensAdicionadosState.push({ name, price });
-                        renderDetailsItems();
-                        calculateDetailsTotal(false);
-                        select.value = "";
-                    } else { console.warn("Seleção inválida:", select.value); }
-                }
-            }
-            // Remover Item
-            else if (e.target.classList.contains('remove-item-btn')) {
-                const index = parseInt(e.target.dataset.index);
-                if (!isNaN(index) && index >= 0 && index < itensAdicionadosState.length) {
-                    itensAdicionadosState.splice(index, 1);
-                    renderDetailsItems();
-                    calculateDetailsTotal(false);
-                } else { console.warn("Índice inválido:", e.target.dataset.index); }
-            }
-         });
-
-        const descontoInput = document.getElementById('detailsDesconto');
-        if(descontoInput) descontoInput.addEventListener('input', () => calculateDetailsTotal(false));
-        else { console.warn("Input detailsDesconto não encontrado."); }
-
-        const saveAndNextBtn = document.getElementById('saveAndNextStatusBtn');
-        if(saveAndNextBtn) saveAndNextBtn.addEventListener('click', () => saveDetailsAndMaybeAdvance(true));
-        else { console.warn("Botão saveAndNextStatusBtn não encontrado."); }
-
-         if(deleteBtn) deleteBtn.addEventListener('click', (e) => {
-            const id = e.target.dataset.id || e.target.closest('[data-id]')?.dataset.id;
-            const pedido = allPedidos[id];
-            if(pedido && confirmDeleteText && confirmDeleteBtn && confirmDeleteModal){
-                confirmDeleteText.innerHTML = `Excluir Pedido <strong>#${pedido.pedidoNumero || id.slice(-5)}</strong> de <strong>${pedido.clienteNome || 'Cliente'}</strong>? <br><strong class="text-red-600">Ação irreversível.</strong>`;
-                confirmDeleteBtn.dataset.id = id;
-                confirmDeleteModal.classList.remove('hidden');
-                confirmDeleteModal.classList.add('flex');
-            } else { console.warn("Não foi possível abrir confirmação de exclusão."); }
-         });
-         else { console.warn("Botão deleteBtn não encontrado."); }
-    } else { console.warn("Modal detailsModal não encontrado."); }
+    if(detailsModal){ detailsModal.addEventListener('click', (e) => { if (e.target.id === 'detailsAddServicoBtn') { const select = document.getElementById('detailsServicosList'); if (select?.value) { const [name, priceStr] = select.value.split('|'); const price = parseFloat(priceStr); if(name && !isNaN(price)){ itensAdicionadosState.push({ name, price }); renderDetailsItems(); calculateDetailsTotal(false); select.value = ""; } else { console.warn("Seleção inválida:", select.value); } } } else if (e.target.classList.contains('remove-item-btn')) { const index = parseInt(e.target.dataset.index); if (!isNaN(index) && index >= 0 && index < itensAdicionadosState.length) { itensAdicionadosState.splice(index, 1); renderDetailsItems(); calculateDetailsTotal(false); } else { console.warn("Índice inválido:", e.target.dataset.index); } } }); const descontoInput = document.getElementById('detailsDesconto'); if(descontoInput) descontoInput.addEventListener('input', () => calculateDetailsTotal(false)); else { console.warn("detailsDesconto não encontrado."); } const saveAndNextBtn = document.getElementById('saveAndNextStatusBtn'); if(saveAndNextBtn) saveAndNextBtn.addEventListener('click', () => saveDetailsAndMaybeAdvance(true)); else { console.warn("saveAndNextStatusBtn não encontrado."); } if(deleteBtn) deleteBtn.addEventListener('click', (e) => { const id = e.target.dataset.id || e.target.closest('[data-id]')?.dataset.id; const pedido = allPedidos[id]; if(pedido && confirmDeleteText && confirmDeleteBtn && confirmDeleteModal){ confirmDeleteText.innerHTML = `Excluir Pedido <strong>#${pedido.pedidoNumero||id.slice(-5)}</strong> de <strong>${pedido.clienteNome||'Cliente'}</strong>?<br><strong class="text-red-600">Irreversível.</strong>`; confirmDeleteBtn.dataset.id = id; confirmDeleteModal.classList.remove('hidden'); confirmDeleteModal.classList.add('flex'); } else { console.warn("Erro abrir confirmação exclusão."); } }); else { console.warn("deleteBtn não encontrado."); } } else { console.warn("detailsModal não encontrado."); }
 
      // --- Confirmação de Exclusão (Pedido) ---
-     if(confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', (e) => {
-        const id = e.target.dataset.id;
-         if (id && confirmDeleteModal) {
-             confirmDeleteBtn.disabled = true;
-             confirmDeleteBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin mr-2'></i> Excluindo...";
-             db.ref(`pedidos/${id}`).remove()
-                .then(() => {
-                    if(detailsModal) detailsModal.classList.add('hidden');
-                    confirmDeleteModal.classList.add('hidden');
-                    showNotification('Pedido excluído.', 'success');
-                })
-                .catch(error => { console.error("Erro ao excluir:", error); showNotification("Erro ao excluir.", "error"); })
-                .finally(() => { confirmDeleteBtn.disabled = false; confirmDeleteBtn.innerHTML = "Sim, Excluir"; });
-         }
-     });
-     else { console.warn("Botão confirmDeleteBtn não encontrado."); }
-
-     if(cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => { if(confirmDeleteModal) confirmDeleteModal.classList.add('hidden'); });
-     else { console.warn("Botão cancelDeleteBtn não encontrado."); }
-
+     if(confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', (e) => { const id = e.target.dataset.id; if (id && confirmDeleteModal) { confirmDeleteBtn.disabled = true; confirmDeleteBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin mr-2'></i> Excluindo..."; db.ref(`pedidos/${id}`).remove().then(() => { if(detailsModal) detailsModal.classList.add('hidden'); confirmDeleteModal.classList.add('hidden'); showNotification('Pedido excluído.', 'success'); }).catch(error => { console.error("Erro excluir:", error); showNotification("Erro.", "error"); }).finally(() => { confirmDeleteBtn.disabled = false; confirmDeleteBtn.innerHTML = "Sim, Excluir"; }); } }); else { console.warn("confirmDeleteBtn não encontrado."); }
+     if(cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => { if(confirmDeleteModal) confirmDeleteModal.classList.add('hidden'); }); else { console.warn("cancelDeleteBtn não encontrado."); }
 
     // --- Formulário de Log e Uploads ---
-    if(logForm) logForm.addEventListener('submit', saveLogAndUploads);
-    else { console.warn("Formulário logForm não encontrado."); }
-
-    if(openCameraBtn) openCameraBtn.addEventListener('click', () => {
-        if(mediaInput) { mediaInput.setAttribute('accept', 'image/*'); mediaInput.setAttribute('capture', 'environment'); mediaInput.multiple = true; mediaInput.value = null; mediaInput.click(); }
-        else { console.warn("Input media-input não encontrado para câmera."); }
-    });
-    else { console.warn("Botão openCameraBtn não encontrado."); }
-
-    if(openGalleryBtn) openGalleryBtn.addEventListener('click', () => {
-        if(mediaInput){ mediaInput.setAttribute('accept', 'image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip,.rar'); mediaInput.removeAttribute('capture'); mediaInput.multiple = true; mediaInput.value = null; mediaInput.click(); }
-        else { console.warn("Input media-input não encontrado para galeria."); }
-    });
-    else { console.warn("Botão openGalleryBtn não encontrado."); }
-
-    if(mediaInput) mediaInput.addEventListener('change', (e) => {
-        filesToUpload = Array.from(e.target.files);
-        if(fileNameDisplay) fileNameDisplay.textContent = filesToUpload.length > 0 ? `${filesToUpload.length} arquivo(s)` : '';
-    });
-    else { console.warn("Input media-input não encontrado."); }
+    if(logForm) logForm.addEventListener('submit', saveLogAndUploads); else { console.warn("logForm não encontrado."); }
+    if(openCameraBtn) openCameraBtn.addEventListener('click', () => { if(mediaInput) { mediaInput.setAttribute('accept', 'image/*'); mediaInput.setAttribute('capture', 'environment'); mediaInput.multiple = true; mediaInput.value = null; mediaInput.click(); } else { console.warn("media-input (câmera) não encontrado."); } }); else { console.warn("openCameraBtn não encontrado."); }
+    if(openGalleryBtn) openGalleryBtn.addEventListener('click', () => { if(mediaInput){ mediaInput.setAttribute('accept', 'image/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx,.zip,.rar'); mediaInput.removeAttribute('capture'); mediaInput.multiple = true; mediaInput.value = null; mediaInput.click(); } else { console.warn("media-input (galeria) não encontrado."); } }); else { console.warn("openGalleryBtn não encontrado."); }
+    if(mediaInput) mediaInput.addEventListener('change', (e) => { filesToUpload = Array.from(e.target.files); if(fileNameDisplay) fileNameDisplay.textContent = filesToUpload.length > 0 ? `${filesToUpload.length} arquivo(s)` : ''; }); else { console.warn("media-input não encontrado."); }
 
     // --- Galeria de Mídia e Lightbox ---
-    const thumbnailGrid = document.getElementById('thumbnail-grid');
-    if(thumbnailGrid) thumbnailGrid.addEventListener('click', (e) => {
-        const thumbnailItem = e.target.closest('.thumbnail-item');
-         const deleteButton = e.target.closest('.delete-media-btn');
-         if (deleteButton) {
-             e.stopPropagation();
-             const { pedidoId, mediaKey } = deleteButton.dataset;
-             if (pedidoId && mediaKey && confirm('Excluir esta mídia?')) {
-                 deleteButton.innerHTML = "<i class='bx bx-loader-alt bx-spin bx-xs'></i>"; deleteButton.disabled = true;
-                 db.ref(`pedidos/${pedidoId}/media/${mediaKey}`).remove()
-                   .then(() => showNotification("Mídia excluída.", "success"))
-                   .catch(err => { console.error("Erro ao excluir:", err); showNotification("Erro.", "error"); deleteButton.innerHTML = "<i class='bx bxs-trash bx-xs'></i>"; deleteButton.disabled = false; });
-             }
-         } else if (thumbnailItem && thumbnailItem.dataset.index !== undefined) {
-            openLightbox(parseInt(thumbnailItem.dataset.index));
-         }
-    });
-    else { console.warn("Elemento thumbnail-grid não encontrado."); }
+    const thumbnailGrid = document.getElementById('thumbnail-grid'); if(thumbnailGrid) thumbnailGrid.addEventListener('click', (e) => { const thumbnailItem = e.target.closest('.thumbnail-item'); const deleteButton = e.target.closest('.delete-media-btn'); if (deleteButton) { e.stopPropagation(); const { pedidoId, mediaKey } = deleteButton.dataset; if (pedidoId && mediaKey && confirm('Excluir mídia?')) { deleteButton.innerHTML = "<i class='bx bx-loader-alt bx-spin bx-xs'></i>"; deleteButton.disabled = true; db.ref(`pedidos/${pedidoId}/media/${mediaKey}`).remove().then(() => showNotification("Mídia excluída.", "success")).catch(err => { console.error("Erro excluir mídia:", err); showNotification("Erro.", "error"); deleteButton.innerHTML = "<i class='bx bxs-trash bx-xs'></i>"; deleteButton.disabled = false; }); } } else if (thumbnailItem?.dataset.index !== undefined) { openLightbox(parseInt(thumbnailItem.dataset.index)); } }); else { console.warn("thumbnail-grid não encontrado."); }
 
      // --- Ações no Modal de Configuração ---
-     if(configModal) configModal.addEventListener('click', removeProdutoConfig);
-     else { console.warn("Modal configModal não encontrado."); }
+     if(configModal) configModal.addEventListener('click', removeProdutoConfig); else { console.warn("configModal não encontrado."); }
 
      // --- Busca Global ---
-     if(globalSearchInput) globalSearchInput.addEventListener('input', handleGlobalSearch);
-     else { console.warn("Input globalSearchInput não encontrado."); }
+     if(globalSearchInput) globalSearchInput.addEventListener('input', handleGlobalSearch); else { console.warn("globalSearchInput não encontrado."); }
+     if(globalSearchResults) globalSearchResults.addEventListener('click', (e) => { const resultItem = e.target.closest('.search-result-item'); if (resultItem?.dataset.id) { openDetailsModal(resultItem.dataset.id); if(globalSearchInput) globalSearchInput.value = ''; globalSearchResults.innerHTML = ''; globalSearchResults.classList.add('hidden'); } }); else { console.warn("globalSearchResults não encontrado."); }
+     document.addEventListener('click', (e) => { const searchContainer = e.target.closest('.search-container'); if (!searchContainer && globalSearchResults && !globalSearchResults.classList.contains('hidden')) { globalSearchResults.classList.add('hidden'); } });
 
-     if(globalSearchResults) globalSearchResults.addEventListener('click', (e) => {
-         const resultItem = e.target.closest('.search-result-item');
-          if (resultItem && resultItem.dataset.id) {
-              openDetailsModal(resultItem.dataset.id);
-              if(globalSearchInput) globalSearchInput.value = '';
-              globalSearchResults.innerHTML = ''; globalSearchResults.classList.add('hidden');
-          }
-     });
-     else { console.warn("Elemento globalSearchResults não encontrado."); }
-     // Esconder busca
-     document.addEventListener('click', (e) => {
-         const searchContainer = e.target.closest('.search-container');
-         if (!searchContainer && globalSearchResults && !globalSearchResults.classList.contains('hidden')) { globalSearchResults.classList.add('hidden'); }
-     });
-
-    console.log("Todos os listeners de eventos foram configurados.");
+    console.log("Listeners configurados.");
 };
-
 
 /* ==================================================================
 INICIALIZAÇÃO DA APLICAÇÃO
 ==================================================================
 */
-// Garante que o DOM esteja pronto
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        checkLoggedInUser(); // Verifica login
-        setupEventListeners(); // Configura eventos
-    });
-} else {
-    // DOM já pronto
-    checkLoggedInUser();
-    setupEventListeners();
-}
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', () => { checkLoggedInUser(); setupEventListeners(); }); }
+else { checkLoggedInUser(); setupEventListeners(); }
 
 // --- FIM DO CÓDIGO ---

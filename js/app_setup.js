@@ -1,6 +1,6 @@
 /* ==================================================================
 PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 1: SETUP
-Versão: FINAL COMPLETA e INTEGRAL - 23/10/2025
+Versão: FINAL COMPLETA e CORRIGIDA (Chamada setupEventListeners Adicionada) - 23/10/2025
 ==================================================================
 */
 
@@ -40,17 +40,23 @@ function showNotification(message, type = 'success') {
   notification.id = 'notification';
   notification.className = `notification ${type}`;
   notification.textContent = message;
+  // Garante que o elemento exista antes de adicionar
   if (document.body) {
-    document.body.appendChild(notification);
-    void notification.offsetWidth;
-    notification.classList.add('show');
-    setTimeout(() => {
-      notification.classList.remove('show');
-      notification.addEventListener('transitionend', () => {
-        if (document.body.contains(notification)) document.body.removeChild(notification);
-      }, { once: true });
-    }, 4000);
-  } else { console.error("document.body não encontrado para notificação."); }
+      document.body.appendChild(notification);
+      void notification.offsetWidth; // Força reflow
+      notification.classList.add('show');
+
+      setTimeout(() => {
+        notification.classList.remove('show');
+        notification.addEventListener('transitionend', () => {
+          if (document.body.contains(notification)) {
+            document.body.removeChild(notification);
+          }
+        }, { once: true });
+      }, 4000);
+  } else {
+      console.error("document.body não encontrado para exibir notificação.");
+  }
 }
 
 /* ==================================================================
@@ -124,8 +130,8 @@ const formatDateTime = (isoString) => isoString ? new Date(isoString).toLocaleSt
 // --- Inicialização do Firebase ---
 let db;
 try {
-    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); console.log("Firebase inicializado."); }
-    else { firebase.app(); console.log("Firebase já inicializado."); }
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); console.log("Firebase inicializado com sucesso."); }
+    else { firebase.app(); console.log("Firebase já estava inicializado."); }
     db = firebase.database();
 } catch(e) { console.error("Erro CRÍTICO Firebase:", e); setTimeout(() => showNotification("Erro crítico: Falha Firebase.", "error"), 500); throw new Error("Falha Firebase."); }
 
@@ -140,7 +146,7 @@ const loadVendedores = async () => {
         const vendedoresData = snapshot.val();
         if (vendedoresData && typeof vendedoresData === 'object' && Object.keys(vendedoresData).length > 0) {
             vendedores = Object.entries(vendedoresData).map(([key, value]) => ({ id: key, name: value.name || key, role: value.role || 'Vendedor' }));
-            console.log("Vendedores carregados:", vendedores);
+            console.log("Vendedores carregados do Firebase:", vendedores);
         } else {
              console.warn("Nenhum vendedor no Firebase ou formato inválido. Usando simulação.");
              vendedores = [{ name: 'Thiago', role: 'Vendedor 1' }, { name: 'Raul', role: 'Vendedor 2' }, { name: 'Guilherme', role: 'Gestor' }];
@@ -159,7 +165,20 @@ const loginUser = async (user) => {
     if(dashboardNav) dashboardNav.classList.remove('hidden');
     if(userScreen) userScreen.classList.add('hidden'); if(app) app.classList.remove('hidden');
     if(vendedorDashboard) vendedorDashboard.innerHTML = '<p class="text-center tc my-10 animate-pulse">Carregando...</p>';
-    await loadConfig(); initializeDashboard(); listenToPedidos();
+
+    await loadConfig();
+    initializeDashboard();
+    listenToPedidos();
+
+    // ***** ALTERAÇÃO CRÍTICA: CHAMA setupEventListeners AQUI *****
+    if (typeof setupEventListeners === 'function') {
+        setupEventListeners(); // Chama a função para anexar os listeners DEPOIS que a UI está visível
+    } else {
+        console.error("ERRO GRAVE: Função setupEventListeners não foi encontrada (verifique app_logic.js).");
+        showNotification("Erro: Falha ao carregar interações da página.", "error");
+    }
+    // ***** FIM DA ALTERAÇÃO *****
+
     if (isGestor) renderDashboardGerencial(); else switchDashboardTab('vendas');
 };
 
@@ -171,7 +190,6 @@ const displayLoginScreen = () => {
      if(userScreen) userScreen.classList.remove('hidden'); if(app) app.classList.add('hidden');
      if (userList) { if(vendedores.length > 0){ userList.innerHTML = vendedores.map(user => `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'> <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p> <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p> </div>`).join(''); } else { userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; } } else { console.error("userList não encontrado."); if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login."); }
 };
-
 
 /* ==================================================================
 LÓGICA DO DASHBOARD E KANBAN
@@ -210,7 +228,7 @@ LISTENERS DO FIREBASE
 ==================================================================
 */
 const listenToPedidos = () => {
-    if (!db) { console.error("DB Firebase não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false;
+    if (!db) { console.error("DB não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false;
     if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>'); }
     else { console.error("Dashboard não encontrado."); return; } allPedidos = {};
     ref.once('value', snapshot => {
@@ -232,5 +250,19 @@ const startIndividualListeners = (ref) => {
 const loadConfig = async () => {
      try { if (!db) throw new Error("DB não disponível."); const snapshot = await db.ref('config').once('value'); configData = snapshot.val() || { produtos: [] }; if (configData.produtos && typeof configData.produtos === 'object' && !Array.isArray(configData.produtos)) { configData.produtos = Object.values(configData.produtos); } else if (!Array.isArray(configData.produtos)) { configData.produtos = []; } configData.produtos.sort((a, b) => (a.name || '').localeCompare(b.name || '')); console.log("Config carregada:", configData.produtos.length, "produtos."); } catch (error) { console.error("Erro loadConfig:", error); showNotification("Erro carregar produtos.", "error"); configData = { produtos: [] }; }
 };
+
+
+/* ==================================================================
+INICIALIZAÇÃO DA APLICAÇÃO (Chamada no final de app_logic.js)
+==================================================================
+*/
+// Garante que o DOM esteja pronto ANTES de tentar configurar listeners ou checar login
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', checkLoggedInUser); // Chama checkLoggedInUser quando DOM estiver pronto
+} else {
+    checkLoggedInUser(); // Chama imediatamente se DOM já estiver pronto
+}
+
+// Nota: setupEventListeners agora é chamado DENTRO de loginUser.
 
 // --- FIM app_setup.js ---

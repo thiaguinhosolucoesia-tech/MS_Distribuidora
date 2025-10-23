@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>EletroIA - Distribuidora Inteligente</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css"> </head>
+<body class="bg-gray-100">
+
+  <div id="userScreen" class="flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
+      <h1 class="text-3xl font-bold text-gray-800 mb-2">EletroIA</h1>
+      <p class="text-xl font-semibold text-blue-800">Distribuidora Inteligente</p>
+      <p class="text-gray-500 my-8">Selecione seu perfil de vendedor para iniciar</p>
+      <div id="userList" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <p class="text-gray-400 text-sm col-span-full">Carregando usuários...</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden flex flex-col min-h-screen">
+    <header class="bg-white shadow-md sticky top-0 z-40">
+      <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center gap-4 flex-wrap">
+        <div class="flex items-center gap-3">
+            <div>
+                <h1 class="text-xl font-bold text-gray-800">EletroIA</h1>
+                <p class="text-sm font-semibold text-blue-800 -mt-1">Distribuidora Inteligente</p>
+            </div>
+        </div>
+
+        <div class="flex-grow max-w-md relative search-container order-3 sm:order-2 w-full sm:w-auto">
+            <input type="search" id="globalSearchInput" placeholder="Buscar por Cliente ou Pedido..." class="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div id="globalSearchResults" class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-md shadow-lg z-50 hidden max-h-60 overflow-y-auto">
+                </div>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-4 order-2 sm:order-3">
+          <button id="configBtn" class="btn bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 flex items-center gap-1 sm:gap-2 hidden">
+            <i class='bx bx-cog'></i><span class="hidden sm:inline">Produtos</span>
+          </button>
+          <button id="addPedidoBtn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 sm:px-4 flex items-center gap-1 sm:gap-2">
+            <i class='bx bx-plus-circle'></i><span class="hidden sm:inline">Novo Pedido</span>
+          </button>
+          <div class="text-right">
+            <p id="currentUserName" class="font-semibold text-gray-700 text-sm sm:text-base">...</p>
+            <button id="logoutButton" class="text-xs sm:text-sm text-red-500 hover:text-red-700">Sair</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8 flex-grow">
+      <div id="vendedorDashboard" class="flex flex-col gap-10">
+        <p class="text-center text-gray-500">Carregando dashboard...</p>
+      </div>
+    </main>
+
+     <footer class="bg-white shadow-inner mt-8 py-4">
+        <div class="container mx-auto px-4 text-center text-gray-600 text-sm">
+            <p>&copy; 2025 EletroIA Distribuidora Inteligente - Desenvolvido com 🤖 por thIAguinho Soluções</p>
+        </div>
+    </footer>
+  </div>
+
+  <div id="pedidoModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
+    <div class="modal-content w-full max-w-xl">
+      <div class="modal-header">
+        <h2 id="pedidoModalTitle" class="text-2xl font-bold text-gray-800">Novo Pedido de Venda</h2>
+        <button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button>
+      </div>
+      <div class="modal-body">
+        <form id="pedidoForm" class="space-y-4">
+          <input type="hidden" id="pedidoId">
+          <div class="form-group">
+            <label for="clienteNome" class="block text-sm font-medium text-gray-700">Nome do Cliente / Empresa</label>
+            <input id="clienteNome" type="text" placeholder="Nome completo ou Razão Social" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500">
+          </div>
+          <div class="form-group">
+            <label for="vendedorResponsavel" class="block text-sm font-medium text-gray-700">Vendedor</label>
+            <select id="vendedorResponsavel" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500">
+                <option value="">Carregando...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="block text-sm font-medium text-gray-700">Itens Iniciais (opcional)</label>
+            <div id="servicosList" class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-md bg-gray-50 max-h-40 overflow-y-auto">
+              <p class="text-gray-400 text-sm col-span-full">Carregando produtos...</p>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="pedidoObservacoes" class="block text-sm font-medium text-gray-700">Observações Iniciais / Queixa do Cliente</label>
+            <textarea id="pedidoObservacoes" placeholder="Ex: Cliente pediu urgência, cotar item X..." rows="3" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-close-modal btn bg-gray-300 hover:bg-gray-400 text-gray-800">Cancelar</button>
+        <button type="submit" form="pedidoForm" class="btn bg-blue-600 hover:bg-blue-700 text-white">Salvar Pedido</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="detailsModal" class="modal fixed inset-0 z-50 hidden items-start justify-center p-4 modal-backdrop">
+    <div class="modal-content w-full max-w-6xl">
+      <div class="modal-header">
+        <div class="flex justify-between items-start w-full">
+          <div>
+            <h2 id="detailsClienteNome" class="text-2xl font-bold text-gray-800">Carregando...</h2>
+            <p id="detailsPedidoNumero" class="text-sm font-bold text-blue-800">Pedido #...</p>
+          </div>
+          <button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <div class="os-details-container">
+          <div class="os-header">
+             <div class="flex justify-between items-start flex-wrap gap-4">
+                <div class="mb-4">
+                    <p id="detailsAgendamento" class="text-sm text-gray-600">Aberto em: ...</p>
+                    <p id="detailsVendedor" class="text-lg text-gray-800 font-bold mt-1">Vendedor: ...</p>
+                </div>
+                <div class="bg-gray-100 p-4 rounded-lg text-center w-full sm:w-auto flex-shrink-0 border border-gray-200">
+                  <p class="text-gray-600 font-bold uppercase text-xs">Valor Atual do Pedido</p>
+                  <p id="detailsValorTotalDisplay" class="font-bold text-3xl text-green-700">R$ 0,00</p>
+                </div>
+            </div>
+            <div id="detailsObservacoesContainer" class="hidden mt-4 pt-4 border-t border-gray-200">
+                </div>
+          </div>
+
+          <div class="os-content">
+            <div class="space-y-6">
+              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                <h3 class="section-title">📦 Itens do Pedido</h3>
+                <div id="detailsItensContainer" class="mt-1 space-y-2">
+                  <p class="text-gray-400 text-sm">Nenhum item.</p>
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                  <h4 class="text-sm font-medium text-gray-600 mb-2">Adicionar Item</h4>
+                  <div class="flex gap-2">
+                      <select id="detailsServicosList" class="p-2 border rounded w-full bg-white flex-grow focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">-- Carregando Produtos --</option>
+                      </select>
+                      <button type="button" id="detailsAddServicoBtn" class="btn bg-gray-700 hover:bg-gray-800 text-white px-3 flex-shrink-0">Add</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                <h3 class="section-title">🖼️ Galeria de Mídia (Upload Cloudinary)</h3>
+                <div id="thumbnail-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4">
+                    <p class="text-gray-400 text-sm col-span-full text-center py-4">Nenhuma mídia.</p>
+                </div>
+              </div>
+
+              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                <h3 class="section-title">📜 Histórico do Pedido (Timeline)</h3>
+                <div id="timelineContainer" class="timeline mt-4 space-y-6">
+                   <p class="text-gray-400 text-sm text-center py-4">Nenhum histórico.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="os-actions-section space-y-6">
+              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                  <h3 class="section-title">➕ Adicionar Atualização</h3>
+                  <form id="logForm" class="space-y-4">
+                    <input type="hidden" id="logPedidoId">
+                    <div>
+                       <label for="logDescricao" class="block text-sm font-medium text-gray-700">Descrição</label>
+                       <textarea id="logDescricao" placeholder="Descrição da negociação, observação..." rows="3" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Anexar Mídia (Opcional)</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="openCameraBtn" class="w-full btn bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 flex items-center justify-center gap-2 cursor-pointer">
+                                <i class='bx bxs-camera'></i> Câmera
+                            </button>
+                            <button type="button" id="openGalleryBtn" class="w-full btn bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 flex items-center justify-center gap-2 cursor-pointer">
+                                <i class='bx bxs-file-plus'></i> Arquivo
+                            </button>
+                        </div>
+                      <input id="media-input" type="file" class="hidden" multiple accept="image/*,video/*,application/pdf">
+                      <p id="fileName" class="text-sm text-gray-500 mt-1 truncate h-4"></p> </div>
+                    <button type="submit" class="w-full btn bg-green-600 hover:bg-green-700 text-white px-4 py-2 flex items-center justify-center gap-2">
+                      <i class='bx bx-message-square-add'></i> Adicionar ao Histórico
+                    </button>
+                  </form>
+              </div>
+
+              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                  <h3 class="section-title">💵 Fechamento</h3>
+                  <div class="form-group">
+                      <label for="detailsFormaPagamento" class="block text-sm font-medium text-gray-700">Forma de Pagamento</label>
+                      <select id="detailsFormaPagamento" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Carregando...</option>
+                      </select>
+                  </div>
+                  <div class="form-group mt-4"> <label for="detailsDesconto" class="block text-sm font-medium text-gray-700">Desconto (R$)</label>
+                      <input id="detailsDesconto" type="number" step="0.01" value="0" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500">
+                  </div>
+                  <button type="button" id="saveAndNextStatusBtn" class="w-full btn bg-blue-600 hover:bg-blue-700 text-white mt-6"> <i class='bx bx-fast-forward-circle'></i> Salvar e Avançar Status
+                  </button>
+              </div>
+
+              <div class="bg-white rounded-lg shadow p-4 border border-gray-200">
+                  <button id="deleteBtn" class="w-full btn bg-red-600 hover:bg-red-700 text-white hidden">
+                    <i class='bx bx-trash'></i> Excluir Pedido
+                  </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="configModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
+      <div class="modal-content w-full max-w-3xl">
+          <div class="modal-header">
+              <h2 class="text-2xl font-bold text-gray-800">⚙️ Gerenciar Produtos</h2>
+              <button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button>
+          </div>
+          <div class="modal-body">
+              <div>
+                  <h3 class="section-title">Catálogo de Produtos</h3>
+                  <div id="configServicosList" class="space-y-2 mb-4 max-h-60 overflow-y-auto border p-2 rounded bg-gray-50">
+                    <p class="text-gray-400 text-sm text-center">Carregando...</p>
+                  </div>
+                  <form id="addServicoForm" class="flex flex-wrap gap-2 border-t pt-4">
+                      <input type="text" id="newServicoName" placeholder="Nome do Produto/Serviço" class="p-2 border rounded flex-grow min-w-[200px] bg-white focus:ring-blue-500 focus:border-blue-500" required>
+                      <input type="number" id="newServicoPrice" placeholder="Preço" class="p-2 border rounded w-full sm:w-auto bg-white focus:ring-blue-500 focus:border-blue-500" required step="0.01" min="0">
+                      <button type="submit" class="btn bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto">Adicionar Produto</button>
+                  </form>
+              </div>
+          </div>
+           <div class="modal-footer">
+               <button type="button" class="btn-close-modal btn bg-gray-300 hover:bg-gray-400 text-gray-800">Fechar</button>
+           </div>
+      </div>
+  </div>
+
+  <div id="lightbox" class="modal fixed inset-0 z-[100] hidden items-center justify-center p-4 modal-backdrop">
+    <div class="absolute inset-0" id="lightbox-close-bg"></div>
+    <div class="relative bg-black bg-opacity-75 p-4 rounded-lg max-w-4xl max-h-[90vh] w-auto">
+        <div id="lightbox-content" class="flex items-center justify-center overflow-auto max-h-[calc(90vh-4rem)]">
+          <p class="text-white">Carregando mídia...</p>
+        </div>
+        <button id="lightbox-close" class="absolute -top-3 -right-3 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center text-2xl shadow-lg border-2 border-gray-300">&times;</button>
+         </div>
+  </div>
+
+  <div id="confirmDeleteModal" class="modal fixed inset-0 z-[101] hidden items-center justify-center p-4 modal-backdrop">
+    <div class="modal-content w-full max-w-md">
+        <div class="modal-header items-center"> <i class='bx bxs-error-circle text-red-600 text-3xl mr-3'></i>
+           <h2 class="text-xl font-bold text-gray-800">Confirmar Exclusão</h2>
+        </div>
+        <div class="modal-body">
+            <p id="confirmDeleteText" class="text-center text-gray-700">Você tem certeza?</p>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelDeleteBtn" class="btn bg-gray-300 hover:bg-gray-400 text-gray-800">Cancelar</button>
+            <button id="confirmDeleteBtn" class="btn bg-red-600 hover:bg-red-700 text-white">Sim, Excluir</button>
+        </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="js/app.js"></script> </body>
+</html>

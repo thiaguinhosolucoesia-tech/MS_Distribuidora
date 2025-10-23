@@ -1,6 +1,6 @@
 /* ==================================================================
 PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 2: LÓGICA
-Versão: FINAL COMPLETA e INTEGRAL - 23/10/2025
+Versão: FINAL COMPLETA e CORRIGIDA (Listeners Fix) - 23/10/2025
 ==================================================================
 */
 
@@ -12,74 +12,163 @@ FUNÇÕES DE MANIPULAÇÃO DE PEDIDOS
 ==================================================================
 */
 const updatePedidoStatus = async (id, newStatus) => {
+    // Código completo da função updatePedidoStatus
     const pedido = allPedidos[id];
     if (!pedido) { showNotification("Erro: Pedido não encontrado.", "error"); return; }
     if (!newStatus || !STATUS_LIST.includes(newStatus)) { showNotification(`Erro: Status inválido.`, "error"); return; }
-    if (pedido.status === newStatus) return;
+    if (pedido.status === newStatus) return; // Já está no status desejado
+
     const oldStatus = pedido.status;
-    const logEntry = { timestamp: new Date().toISOString(), user: currentUser.name, description: `Status: ${formatStatus(oldStatus)} -> ${formatStatus(newStatus)}.`, type: 'status' };
+    // Log detalhado da mudança de status
+    const logEntry = {
+        timestamp: new Date().toISOString(),
+        user: currentUser.name,
+        description: `Status alterado de "${formatStatus(oldStatus)}" para "${formatStatus(newStatus)}".`,
+        type: 'status' // Marca como log de mudança de status
+    };
     try {
-         if (!db) throw new Error("DB não inicializado.");
+         if (!db) throw new Error("DB Firebase não inicializado.");
+         // 1. Adiciona o log
          await db.ref(`pedidos/${id}/logs`).push(logEntry);
+         // 2. Atualiza o status e a data da última modificação do pedido
          await db.ref(`pedidos/${id}`).update({ status: newStatus, lastUpdate: new Date().toISOString() });
-    } catch (error) { console.error("Erro updateStatus:", error); showNotification("Falha mover pedido.", "error"); }
+         // Notificação opcional, pode ser removida se for muito frequente
+         // showNotification(`Pedido movido para ${formatStatus(newStatus)}.`, "success");
+    } catch (error) {
+        console.error("Erro ao atualizar status do pedido:", error);
+        showNotification("Falha ao mover o pedido. Tente novamente.", "error");
+    }
 };
 
 const saveNewPedido = async (e) => {
-    e.preventDefault();
+    // Código completo da função saveNewPedido
+    e.preventDefault(); // Impede recarregamento da página
     const clienteNomeInput = document.getElementById('clienteNome');
     const vendedorSelect = document.getElementById('vendedorResponsavel');
     const observacoesInput = document.getElementById('pedidoObservacoes');
     const formButton = pedidoForm ? pedidoForm.querySelector('button[type="submit"]') : null;
-    if(formButton) formButton.disabled = true;
+
+    if(formButton) formButton.disabled = true; // Desabilita botão durante o processo
+
     const clienteNome = clienteNomeInput?.value.trim() || '';
     const vendedorResponsavel = vendedorSelect?.value || '';
     const observacoes = observacoesInput?.value.trim() || '';
-    if (!clienteNome || !vendedorResponsavel) { showNotification("Cliente e Vendedor obrigatórios.", "error"); if(formButton) formButton.disabled = false; return; }
+
+    // Validação de campos obrigatórios
+    if (!clienteNome || !vendedorResponsavel) {
+         showNotification("Nome do cliente e Vendedor são obrigatórios.", "error");
+         if(formButton) formButton.disabled = false; // Reabilita botão
+         return;
+    }
+
+    // Coleta itens selecionados (checkboxes)
     const selectedItensCheckboxes = Array.from(document.querySelectorAll('#servicosList input:checked'));
-    const itens = selectedItensCheckboxes.map(i => ({ name: i.dataset.name, price: parseFloat(i.value) || 0 }));
+    const itens = selectedItensCheckboxes.map(input => ({
+        name: input.dataset.name,
+        price: parseFloat(input.value) || 0
+    }));
     const valorTotalInicial = itens.reduce((sum, item) => sum + item.price, 0);
-    let pedidoNumero = 1000;
+
+    let pedidoNumero = 1000; // Número padrão inicial
     try {
-         if (!db) throw new Error("DB não inicializado.");
+         // Gera número sequencial usando transaction no Firebase
+         if (!db) throw new Error("DB Firebase não inicializado.");
          const configRef = db.ref('config/proximoPedido');
-         const { committed, snapshot } = await configRef.transaction(curr => (curr || 1000) + 1);
-         if (committed && snapshot.val()) { pedidoNumero = snapshot.val(); } else { throw new Error("Falha transação número."); }
-    } catch (error) { console.error("Erro gerar número:", error); showNotification('Erro gerar número.', 'error'); if(formButton) formButton.disabled = false; return; }
-    const timestamp = new Date().toISOString();
-    const pedidoData = { pedidoNumero, clienteNome, vendedorResponsavel, observacoes, agendamento: timestamp, itens, formaPagamento: FORMAS_PAGAMENTO[0], valorTotal: valorTotalInicial, desconto: 0, status: STATUS_LIST[0], createdAt: timestamp, lastUpdate: timestamp };
+         const { committed, snapshot } = await configRef.transaction(currentValue => (currentValue || 1000) + 1);
+         if (committed && snapshot.val()) {
+             pedidoNumero = snapshot.val();
+         } else {
+              throw new Error("Falha na transação do Firebase para obter o número do pedido.");
+         }
+    } catch (error) {
+         console.error("Erro crítico ao gerar número do pedido:", error);
+         showNotification('Erro ao gerar número do pedido. Tente novamente mais tarde.', 'error');
+         if(formButton) formButton.disabled = false; // Reabilita botão
+         return; // Aborta a criação do pedido
+    }
+
+    const timestamp = new Date().toISOString(); // Timestamp atual
+
+    // Monta o objeto de dados do novo pedido
+    const pedidoData = {
+      pedidoNumero, clienteNome, vendedorResponsavel, observacoes,
+      agendamento: timestamp, // Data/Hora de criação
+      itens: itens,
+      formaPagamento: FORMAS_PAGAMENTO[0], // Usa o primeiro da lista como padrão
+      valorTotal: valorTotalInicial, desconto: 0,
+      status: STATUS_LIST[0], // Status inicial ('Novos-Leads')
+      createdAt: timestamp, lastUpdate: timestamp,
+      // 'logs' será adicionado via push separadamente
+    };
+
     try {
-        if (!db) throw new Error("DB não inicializado.");
-        const newPedidoRef = db.ref('pedidos').push(); const pedidoIdFirebase = newPedidoRef.key;
+        if (!db) throw new Error("DB Firebase não inicializado.");
+        const newPedidoRef = db.ref('pedidos').push(); // Cria um novo nó com ID único
+        const pedidoIdFirebase = newPedidoRef.key; // Obtém o ID gerado
+
+        // Cria o log inicial de criação
         const initialLog = { timestamp, user: currentUser.name, description: 'Pedido criado.', type: 'log' };
-        await db.ref(`pedidos/${pedidoIdFirebase}/logs`).push(initialLog); // Salva log
-        await newPedidoRef.set(pedidoData); // Salva dados principais
-        showNotification(`Pedido #${pedidoNumero} criado!`, 'success'); if(pedidoModal) pedidoModal.classList.add('hidden');
-    } catch (error) { console.error("Erro salvar pedido:", error); showNotification(`Erro: ${error.message}`, 'error'); }
-    finally { if(formButton) formButton.disabled = false; }
+        // Adiciona o log inicial usando push() dentro do nó 'logs' do novo pedido
+        await db.ref(`pedidos/${pedidoIdFirebase}/logs`).push(initialLog);
+
+        // Define os dados principais do pedido (sem os logs, pois já foram adicionados)
+        await newPedidoRef.set(pedidoData);
+
+        showNotification(`Pedido #${pedidoNumero} criado com sucesso!`, 'success');
+        if(pedidoModal) pedidoModal.classList.add('hidden'); // Fecha o modal
+    } catch (error) {
+        console.error("Erro ao salvar o novo pedido no Firebase:", error);
+        showNotification(`Erro ao salvar pedido: ${error.message}`, 'error');
+        // Considerar reverter o contador 'proximoPedido' em caso de falha aqui (lógica mais complexa)
+    } finally {
+         if(formButton) formButton.disabled = false; // Reabilita botão sempre ao final
+    }
 };
 
 const saveDetailsAndMaybeAdvance = async (advanceStatus = false) => {
+    // Código completo da função saveDetailsAndMaybeAdvance
     const id = document.getElementById('logPedidoId')?.value;
-    if (!id || !allPedidos[id]) { showNotification("Erro: ID inválido.", "error"); return false; }
+    if (!id || !allPedidos[id]) { showNotification("Erro: ID do pedido inválido para salvar.", "error"); return false; }
     const pedidoAtual = allPedidos[id]; const saveButton = document.getElementById('saveAndNextStatusBtn');
-    if(saveButton) saveButton.disabled = true;
-    const valorTotalCalculado = calculateDetailsTotal(false);
-    const updates = { itens: itensAdicionadosState, formaPagamento: document.getElementById('detailsFormaPagamento')?.value || pedidoAtual.formaPagamento, desconto: parseFloat(document.getElementById('detailsDesconto')?.value) || 0, valorTotal: valorTotalCalculado, lastUpdate: new Date().toISOString() };
+    if(saveButton) saveButton.disabled = true; // Desabilita botão durante o processo
+    const valorTotalCalculado = calculateDetailsTotal(false); // Calcula o valor com base nos itens do modal
+    const updates = {
+        itens: itensAdicionadosState, // Salva o array de itens atual do modal
+        formaPagamento: document.getElementById('detailsFormaPagamento')?.value || pedidoAtual.formaPagamento,
+        desconto: parseFloat(document.getElementById('detailsDesconto')?.value) || 0,
+        valorTotal: valorTotalCalculado, // Salva o total recém-calculado
+        lastUpdate: new Date().toISOString() // Atualiza data da última modificação
+    };
     try {
-        if (!db) throw new Error("DB não inicializado.");
-        await db.ref(`pedidos/${id}`).update(updates); let msg = 'Alterações salvas!';
+        if (!db) throw new Error("DB Firebase não inicializado.");
+        await db.ref(`pedidos/${id}`).update(updates); // Envia as atualizações para o Firebase
+        let notificationMessage = 'Alterações salvas com sucesso!';
+        // Se a opção de avançar status foi marcada
         if (advanceStatus) {
-            const idx = STATUS_LIST.indexOf(pedidoAtual.status); const next = idx < STATUS_LIST.length - 1 ? STATUS_LIST[idx + 1] : null;
-            if (next) { await updatePedidoStatus(id, next); msg = 'Salvo e avançado!'; }
-            else { msg = 'Salvo! Último status.'; }
+            const currentStatusIndex = STATUS_LIST.indexOf(pedidoAtual.status);
+            const nextStatus = currentStatusIndex < STATUS_LIST.length - 1 ? STATUS_LIST[currentStatusIndex + 1] : null;
+            if (nextStatus) {
+                // Chama a função que atualiza o status E adiciona o log de status
+                await updatePedidoStatus(id, nextStatus);
+                notificationMessage = 'Pedido salvo e status avançado!';
+            } else {
+                 notificationMessage = 'Pedido salvo! Já está no último status.';
+            }
         }
-        showNotification(msg, 'success'); if(detailsModal) detailsModal.classList.add('hidden'); return true;
-    } catch (error) { console.error("Erro salvar/avançar:", error); showNotification(`Erro: ${error.message}`, 'error'); return false; }
-    finally { if(saveButton) saveButton.disabled = false; }
+        showNotification(notificationMessage, 'success'); // Notifica o usuário
+        if(detailsModal) detailsModal.classList.add('hidden'); // Fecha o modal após sucesso
+        return true; // Indica sucesso
+    } catch (error) {
+        console.error("Erro ao salvar detalhes e/ou avançar status:", error);
+        showNotification(`Erro ao salvar: ${error.message}`, 'error');
+        return false; // Indica falha
+    } finally {
+         if(saveButton) saveButton.disabled = false; // Reabilita o botão ao final
+    }
 };
 
 const saveLogAndUploads = async (e) => {
+    // Código completo da função saveLogAndUploads
    e.preventDefault(); const submitBtn = e.target.querySelector('button[type="submit"]'); if (!submitBtn) return;
     const pedidoId = document.getElementById('logPedidoId')?.value; const descriptionInput = document.getElementById('logDescricao');
     const description = descriptionInput?.value.trim() || '';
@@ -88,13 +177,13 @@ const saveLogAndUploads = async (e) => {
     submitBtn.disabled = true; submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin mr-2'></i> Salvando...`;
     const timestamp = new Date().toISOString(); const logEntry = { timestamp, user: currentUser.name, type: 'log', description: description || `Adicionou ${filesToUpload.length} mídia(s).` };
     try {
-        if (!db) throw new Error("DB não inicializado.");
-        await db.ref(`pedidos/${pedidoId}/logs`).push(logEntry);
-        if (filesToUpload.length > 0) {
+        if (!db) throw new Error("DB Firebase não inicializado.");
+        await db.ref(`pedidos/${pedidoId}/logs`).push(logEntry); // Salva log
+        if (filesToUpload.length > 0) { // Processa uploads
             submitBtn.innerHTML = `<i class='bx bx-loader-alt bx-spin mr-2'></i> Enviando ${filesToUpload.length} mídia(s)...`;
             const uploadPromises = filesToUpload.map(async file => { const url = await uploadFileToCloudinary(file); return { type: file.type || 'application/octet-stream', url, name: file.name, timestamp }; });
             const mediaResults = await Promise.all(uploadPromises); const mediaRef = db.ref(`pedidos/${pedidoId}/media`);
-            for (const result of mediaResults) { await mediaRef.push().set(result); }
+            for (const result of mediaResults) { await mediaRef.push().set(result); } // Salva refs da mídia
         }
         if(logForm) logForm.reset(); filesToUpload = []; if(fileNameDisplay) fileNameDisplay.textContent = ''; showNotification('Atualização adicionada!', 'success');
     } catch (error) { if (!error.message?.includes('upload')) { showNotification(`Erro: ${error.message || 'Erro desconhecido'}`, 'error'); } console.error("Erro saveLog:", error); }
@@ -102,22 +191,25 @@ const saveLogAndUploads = async (e) => {
 };
 
 const generateWhatsappOffer = () => {
-    const pedidoId = document.getElementById('logPedidoId')?.value; const pedido = allPedidos[pedidoId]; if (!pedido) { showNotification("Erro: Pedido não carregado.", "error"); return; } const cliente = pedido.clienteNome || "Cliente"; const valorTotal = calculateDetailsTotal(false); const vendedor = currentUser.name || "Vendedor"; let itensTexto = "*Itens:*"; if (itensAdicionadosState.length > 0) { itensTexto += '\n' + itensAdicionadosState.map(item => `- ${item.name} (${formatCurrency(item.price)})`).join('\n'); } else { itensTexto += "\n- (Nenhum item)"; } const desconto = parseFloat(document.getElementById('detailsDesconto')?.value || 0); const descontoTexto = desconto > 0 ? `\n\n*Desconto:* ${formatCurrency(desconto)}` : ''; const valorFinalTexto = `\n\n*Valor Total:* ${formatCurrency(valorTotal)}`; const pagamentoTexto = `\n*Forma Pgto:* ${document.getElementById('detailsFormaPagamento')?.value || 'A definir'}`; const oferta = `Olá ${cliente},\nSegue cotação:\n\n${itensTexto}${descontoTexto}${valorFinalTexto}${pagamentoTexto}\n\nÀ disposição!\n${vendedor}\nMS Distribuidora`; try { navigator.clipboard.writeText(oferta); showNotification("Texto copiado! Cole no WhatsApp.", "success"); const logEntry = { timestamp: new Date().toISOString(), user: currentUser.name, description: `Gerou texto oferta (Valor: ${formatCurrency(valorTotal)})`, type: 'log' }; if(db) db.ref(`pedidos/${pedidoId}/logs`).push(logEntry); } catch (err) { console.error('Erro copiar texto: ', err); showNotification('Erro ao copiar.', 'error'); }
+    // Código completo da função generateWhatsappOffer
+    const pedidoId = document.getElementById('logPedidoId')?.value; const pedido = allPedidos[pedidoId]; if (!pedido) { showNotification("Erro: Pedido não carregado.", "error"); return; } const cliente = pedido.clienteNome || "Cliente"; const valorTotal = calculateDetailsTotal(false); const vendedor = currentUser.name || "Vendedor"; let itensTexto = "*Itens:*"; if (itensAdicionadosState.length > 0) { itensTexto += '\n' + itensAdicionadosState.map(item => `- ${item.name} (${formatCurrency(item.price)})`).join('\n'); } else { itensTexto += "\n- (Nenhum item selecionado)"; } const desconto = parseFloat(document.getElementById('detailsDesconto')?.value || 0); const descontoTexto = desconto > 0 ? `\n\n*Desconto:* ${formatCurrency(desconto)}` : ''; const valorFinalTexto = `\n\n*Valor Total:* ${formatCurrency(valorTotal)}`; const pagamentoTexto = `\n*Forma Pgto:* ${document.getElementById('detailsFormaPagamento')?.value || 'A definir'}`; const oferta = `Olá ${cliente},\nSegue cotação solicitada:\n\n${itensTexto}${descontoTexto}${valorFinalTexto}${pagamentoTexto}\n\nQualquer dúvida, estou à disposição!\n\nAtt,\n${vendedor}\nMS Distribuidora`; try { navigator.clipboard.writeText(oferta); showNotification("Texto copiado! Cole no WhatsApp.", "success"); const logEntry = { timestamp: new Date().toISOString(), user: currentUser.name, description: `Gerou texto oferta (Valor: ${formatCurrency(valorTotal)})`, type: 'log' }; if(db) db.ref(`pedidos/${pedidoId}/logs`).push(logEntry); } catch (err) { console.error('Erro copiar texto: ', err); showNotification('Erro ao copiar.', 'error'); }
 };
+
 
 /* ==================================================================
 MODAL DE DETALHES - Funções Internas
 ==================================================================
 */
 const openDetailsModal = async (id) => {
+    // Código completo da função openDetailsModal
     const pedido = allPedidos[id]; if (!pedido) { showNotification("Erro: Pedido não encontrado.", "error"); return; } if(!detailsModal) return;
     detailsModal.scrollTop = 0; if(logForm) logForm.reset(); const logPedidoIdInput = document.getElementById('logPedidoId'); if(logPedidoIdInput) logPedidoIdInput.value = id; filesToUpload = []; if(fileNameDisplay) fileNameDisplay.textContent = '';
-    const detailsClienteNome = document.getElementById('detailsClienteNome'); if(detailsClienteNome) detailsClienteNome.textContent = pedido.clienteNome || 'Cliente'; const detailsPedidoNumero = document.getElementById('detailsPedidoNumero'); if(detailsPedidoNumero) detailsPedidoNumero.textContent = `Pedido #${String(pedido.pedidoNumero || 'N/A').padStart(4, '0')}`; const detailsAgendamento = document.getElementById('detailsAgendamento'); if(detailsAgendamento) detailsAgendamento.textContent = `Aberto: ${formatDateTime(pedido.createdAt || pedido.agendamento)}`; const detailsVendedor = document.getElementById('detailsVendedor'); if(detailsVendedor) detailsVendedor.textContent = `Vendedor: ${pedido.vendedorResponsavel || 'N/A'}`; const obsContainer = document.getElementById('detailsObservacoesContainer'); if(obsContainer){ if (pedido.observacoes) { obsContainer.innerHTML = `<h4 class="text-xs font-medium text-gray-500 mb-1">Obs. Iniciais:</h4><p class="text-gray-700 bg-yellow-50 border border-yellow-200 p-2 rounded-md whitespace-pre-wrap text-sm">${pedido.observacoes}</p>`; obsContainer.classList.remove('hidden'); } else { obsContainer.innerHTML = ''; obsContainer.classList.add('hidden'); } } const pgtoSelect = document.getElementById('detailsFormaPagamento'); if(pgtoSelect){ pgtoSelect.innerHTML = FORMAS_PAGAMENTO.map(f => `<option value="${f}" ${f === pedido.formaPagamento ? 'selected' : ''}>${f}</option>`).join(''); } const descInput = document.getElementById('detailsDesconto'); if(descInput) descInput.value = pedido.desconto || 0; const itemsSelect = document.getElementById('detailsServicosList'); if(itemsSelect && configData.produtos){ itemsSelect.innerHTML = '<option value="">-- Adicionar --</option>' + configData.produtos.map(p => `<option value="${p.name}|${p.price}">${p.name} - ${formatCurrency(p.price)}</option>`).join(''); } else if(itemsSelect){ itemsSelect.innerHTML = '<option value="">-- Erro --</option>'; }
+    const detailsClienteNome = document.getElementById('detailsClienteNome'); if(detailsClienteNome) detailsClienteNome.textContent = pedido.clienteNome || 'Cliente'; const detailsPedidoNumero = document.getElementById('detailsPedidoNumero'); if(detailsPedidoNumero) detailsPedidoNumero.textContent = `Pedido #${String(pedido.pedidoNumero || 'N/A').padStart(4, '0')}`; const detailsAgendamento = document.getElementById('detailsAgendamento'); if(detailsAgendamento) detailsAgendamento.textContent = `Aberto em: ${formatDateTime(pedido.createdAt || pedido.agendamento)}`; const detailsVendedor = document.getElementById('detailsVendedor'); if(detailsVendedor) detailsVendedor.textContent = `Vendedor: ${pedido.vendedorResponsavel || 'N/A'}`; const obsContainer = document.getElementById('detailsObservacoesContainer'); if(obsContainer){ if (pedido.observacoes) { obsContainer.innerHTML = `<h4 class="text-xs font-medium text-gray-500 mb-1">Obs. Iniciais:</h4><p class="text-gray-700 bg-yellow-50 border border-yellow-200 p-2 rounded-md whitespace-pre-wrap text-sm">${pedido.observacoes}</p>`; obsContainer.classList.remove('hidden'); } else { obsContainer.innerHTML = ''; obsContainer.classList.add('hidden'); } } const pgtoSelect = document.getElementById('detailsFormaPagamento'); if(pgtoSelect){ pgtoSelect.innerHTML = FORMAS_PAGAMENTO.map(f => `<option value="${f}" ${f === pedido.formaPagamento ? 'selected' : ''}>${f}</option>`).join(''); } const descInput = document.getElementById('detailsDesconto'); if(descInput) descInput.value = pedido.desconto || 0; const itemsSelect = document.getElementById('detailsServicosList'); if(itemsSelect && configData.produtos){ itemsSelect.innerHTML = '<option value="">-- Adicionar --</option>' + configData.produtos.map(p => `<option value="${p.name}|${p.price}">${p.name} - ${formatCurrency(p.price)}</option>`).join(''); } else if(itemsSelect){ itemsSelect.innerHTML = '<option value="">-- Erro --</option>'; }
     itensAdicionadosState = Array.isArray(pedido.itens) ? [...pedido.itens] : [];
     renderDetailsItems(); calculateDetailsTotal(false); renderTimeline(pedido); renderMediaGallery(pedido);
     if(deleteBtn) { deleteBtn.classList.toggle('hidden', !(currentUser?.role?.toLowerCase().includes('gestor'))); deleteBtn.dataset.id = id; }
     detailsModal.classList.remove('hidden'); detailsModal.classList.add('flex');
-    const historicoContainer = document.getElementById('detailsHistoricoCliente'); if(historicoContainer && pedido.clienteNome) { historicoContainer.innerHTML = '<p class="text-gray-400 text-xs italic animate-pulse">Buscando...</p>'; try { const snapshot = await db.ref('pedidos').orderByChild('clienteNome').equalTo(pedido.clienteNome).limitToLast(6).once('value'); const historico = snapshot.val() || {}; const anteriores = Object.entries(historico).map(([k, p]) => ({...p, id: k})).filter(p => p.id !== id && p.status === 'Entregue').sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5); pedido.historicoAnterior = anteriores; if(anteriores.length > 0) { historicoContainer.innerHTML = anteriores.map(p => `<div class="historico-item"><div class="flex justify-between text-xs text-gray-500 mb-1"><span>#${p.pedidoNumero || p.id.slice(-4)} (${formatDate(p.createdAt)})</span><span class="font-medium">${formatCurrency(p.valorTotal)}</span></div><p class="text-gray-700 truncate text-xs" title="${(p.itens || []).map(i=>i.name).join(', ')}">${(p.itens || []).map(i=>i.name).join(', ') || 'N/A'}</p></div>`).join(''); } else { historicoContainer.innerHTML = '<p class="text-gray-500 text-xs italic tc">Nenhum pedido anterior.</p>'; } generateSalesAssistV1Suggestions(pedido, anteriores); } catch (error) { console.error("Erro histórico:", error); historicoContainer.innerHTML = '<p class="text-red-500 text-xs">Erro buscar.</p>'; generateSalesAssistV1Suggestions(pedido, []); } } else if (historicoContainer) { historicoContainer.innerHTML = '<p class="text-gray-500 text-xs italic">Cliente não identificado.</p>'; generateSalesAssistV1Suggestions(pedido, []); } getGeminiSuggestions(pedido, itensAdicionadosState);
+    const historicoContainer = document.getElementById('detailsHistoricoCliente'); if(historicoContainer && pedido.clienteNome) { historicoContainer.innerHTML = '<p class="text-gray-400 text-xs italic animate-pulse">Buscando...</p>'; try { if (!db) throw new Error("DB não inicializado."); const snapshot = await db.ref('pedidos').orderByChild('clienteNome').equalTo(pedido.clienteNome).limitToLast(6).once('value'); const historico = snapshot.val() || {}; const anteriores = Object.entries(historico).map(([k, p]) => ({...p, id: k})).filter(p => p.id !== id && p.status === 'Entregue').sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5); pedido.historicoAnterior = anteriores; if(anteriores.length > 0) { historicoContainer.innerHTML = anteriores.map(p => `<div class="historico-item"><div class="flex justify-between text-xs text-gray-500 mb-1"><span>#${p.pedidoNumero || p.id.slice(-4)} (${formatDate(p.createdAt)})</span><span class="font-medium">${formatCurrency(p.valorTotal)}</span></div><p class="text-gray-700 truncate text-xs" title="${(p.itens || []).map(i=>i.name).join(', ')}">${(p.itens || []).map(i=>i.name).join(', ') || 'N/A'}</p></div>`).join(''); } else { historicoContainer.innerHTML = '<p class="text-gray-500 text-xs italic tc">Nenhum pedido anterior.</p>'; } generateSalesAssistV1Suggestions(pedido, anteriores); } catch (error) { console.error("Erro histórico:", error); historicoContainer.innerHTML = '<p class="text-red-500 text-xs">Erro buscar.</p>'; generateSalesAssistV1Suggestions(pedido, []); } } else if (historicoContainer) { historicoContainer.innerHTML = '<p class="text-gray-500 text-xs italic">Cliente não identificado.</p>'; generateSalesAssistV1Suggestions(pedido, []); } getGeminiSuggestions(pedido, itensAdicionadosState);
 };
 
 const renderDetailsItems = () => {
@@ -125,7 +217,7 @@ const renderDetailsItems = () => {
 };
 
 const calculateDetailsTotal = (saveToDB = false) => {
-     const itens = Array.isArray(itensAdicionadosState) ? itensAdicionadosState : []; const itensTotal = itens.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0); const descontoInput = document.getElementById('detailsDesconto'); const desconto = parseFloat(descontoInput?.value || 0) || 0; const total = Math.max(0, itensTotal - desconto); const totalDisplay = document.getElementById('detailsValorTotalDisplay'); if(totalDisplay) totalDisplay.textContent = formatCurrency(total); if (saveToDB) { const id = document.getElementById('logPedidoId')?.value; if (id && allPedidos[id]) { const valorAtualDB = allPedidos[id].valorTotal; if (formatCurrency(valorAtualDB) !== formatCurrency(total)) { console.log(`Atualizando DB ${id}: ${formatCurrency(total)}`); if(db) db.ref(`pedidos/${id}/valorTotal`).set(total).catch(error => { console.error("Erro salvar total:", error); }); } } } return total;
+     const itens = Array.isArray(itensAdicionadosState) ? itensAdicionadosState : []; const itensTotal = itens.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0); const descontoInput = document.getElementById('detailsDesconto'); const desconto = parseFloat(descontoInput?.value || 0) || 0; const total = Math.max(0, itensTotal - desconto); const totalDisplay = document.getElementById('detailsValorTotalDisplay'); if(totalDisplay) totalDisplay.textContent = formatCurrency(total); if (saveToDB) { const id = document.getElementById('logPedidoId')?.value; if (id && allPedidos[id]) { const valorAtualDB = allPedidos[id].valorTotal; if (formatCurrency(valorAtualDB) !== formatCurrency(total)) { if(db) db.ref(`pedidos/${id}/valorTotal`).set(total).catch(error => { console.error("Erro salvar total:", error); }); } } } return total;
 };
 
 const renderTimeline = (pedido) => {
@@ -149,16 +241,16 @@ const generateSalesAssistV1Suggestions = (pedidoAtual, pedidosAnteriores) => {
     itensAtuaisNomes.forEach(itemName => { for (const ruleItem in CROSS_SELL_RULES) { if (itemName.includes(ruleItem.toLowerCase())) { CROSS_SELL_RULES[ruleItem].forEach(suggestion => { if (!itensAtuaisNomes.some(i => i.includes(suggestion.toLowerCase()))) { suggestions.push(`P/ ${ruleItem}: Ofereça **${suggestion}**.`); } }); } } });
     const produtoFreq = "Fita Isolante"; const comprasProd = pedidosAnteriores.filter(p => p.itens?.some(i => i.name.toLowerCase().includes(produtoFreq.toLowerCase()))).sort((a,b) => new Date(b.createdAt||0) - new Date(a.createdAt||0)); if (comprasProd.length > 0) { const diffDays = Math.floor((new Date() - new Date(comprasProd[0].createdAt)) / 86400000); if (diffDays > FREQUENCY_ALERT_DAYS) { suggestions.push(`ALERTA: Última compra de ${produtoFreq} há ${diffDays} dias.`); } } else if (pedidosAnteriores.length > 0) { suggestions.push(`OPORT.: Cliente parece não comprar ${produtoFreq}.`); }
     if (itensAtuaisNomes.some(i => i.includes("1.5mm"))) { const comprouMaior = pedidosAnteriores.some(p => p.itens?.some(i => i.name.includes("2.5mm") || i.name.includes("4mm"))); if (comprouMaior) { suggestions.push(`INFO: Cliente já usou cabos > 1.5mm.`); } }
-    if (suggestions.length > 0) { outputDiv.innerHTML = '<ul>' + suggestions.slice(0, 3).map(s => `<li class="mb-1 text-xs">${s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`).join('') + '</ul>'; } // Tamanho fonte menor
+    if (suggestions.length > 0) { outputDiv.innerHTML = '<ul>' + suggestions.slice(0, 3).map(s => `<li class="mb-1 text-xs">${s.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</li>`).join('') + '</ul>'; }
     else { outputDiv.innerHTML = '<p class="italic text-xs text-gray-500">Sem sugestões (V1).</p>'; }
 };
 
 const getGeminiSuggestions = async (pedidoAtual, itensAtuais) => {
     const outputDiv = document.getElementById('assistenteVendasOutput'); const refreshBtn = document.getElementById('geminiRefreshBtn'); if (!outputDiv || !refreshBtn || !GEMINI_API_KEY || GEMINI_API_KEY === "COLE_SUA_GEMINI_API_KEY_AQUI") { console.warn("Gemini desativado."); if(outputDiv && !outputDiv.innerHTML.includes('<li>')) outputDiv.innerHTML = '<p class="italic text-xs text-gray-500">IA não config.</p>'; if(refreshBtn) refreshBtn.classList.add('hidden'); return; } if(refreshBtn) refreshBtn.classList.remove('hidden'); outputDiv.innerHTML = '<p class="animate-pulse-subtle text-xs text-blue-700">IA pensando...</p>'; refreshBtn.disabled = true;
     const nomeCliente = pedidoAtual.clienteNome || "Cliente"; const itensAtuaisNomes = (Array.isArray(itensAtuais)?itensAtuais:[]).map(i => i.name).join(', ') || "Nenhum"; const historicoItens = pedidoAtual.historicoAnterior?.slice(0,2).flatMap(p => p.itens||[]).map(i => i.name).join(', ') || "Nenhum";
-    const prompt = `Você é um assistente expert em vendas B2B de materiais elétricos/construção. Cliente "${nomeCliente}". Pedido ATUAL: ${itensAtuaisNomes}. Histórico RECENTE: ${historicoItens}. Gere EXATAMENTE 2 sugestões CURTAS e PRÁTICAS para o vendedor: 1. Cross-sell (item complementar ao pedido atual). 2. Oportunidade (baseada no histórico ou falta dele). Use **negrito** para produtos. Formato: "- Sugestão 1.\n- Sugestão 2."`;
+    const prompt = `Assistente de vendas B2B (materiais elétricos/construção). Cliente "${nomeCliente}". Pedido ATUAL: ${itensAtuaisNomes}. Histórico RECENTE: ${historicoItens}. Gere EXATAMENTE 2 sugestões CURTAS e PRÁTICAS para o vendedor: 1. Cross-sell (item complementar ao pedido atual). 2. Oportunidade (baseada no histórico ou falta dele). Use **negrito** para produtos. Formato: "- Sugestão 1.\\n- Sugestão 2."`;
     try { const response = await fetch(GEMINI_API_URL, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], safetySettings: [{ category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },{ category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },{ category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },{ category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }], generationConfig: { temperature: 0.6, maxOutputTokens: 150 } }) }); if (!response.ok) { const errTxt = await response.text(); console.error("Erro Gemini:", response.status, errTxt); throw new Error(`API (${response.status})`); } const data = await response.json(); const suggestionText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (suggestionText) { const formatted = suggestionText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/^- /gm, '<li class="mb-1">').replace(/\n/g, '</li>'); outputDiv.innerHTML = `<ul class="list-disc pl-4 text-xs">${formatted}</li></ul>`; } // Adiciona pl-4
+        if (suggestionText) { const formatted = suggestionText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/^- /gm, '<li class="mb-1">').replace(/\n/g, '</li>'); outputDiv.innerHTML = `<ul class="list-disc pl-4 text-xs">${formatted}</li></ul>`; }
         else { console.warn("Resposta IA vazia:", data); outputDiv.innerHTML = '<p class="italic text-xs text-orange-700">IA sem sugestões.</p>'; }
     } catch (error) { console.error("Erro Gemini API:", error); outputDiv.innerHTML = `<p class="italic text-xs text-red-600">Erro IA (${error.message}).</p>`; } finally { refreshBtn.disabled = false; }
 };
@@ -168,26 +260,16 @@ MODAL DE CONFIGURAÇÃO - Funções
 ==================================================================
 */
 const openConfigModal = () => {
-    // Expansão completa da função openConfigModal
-    renderConfigLists();
-     if(configModal){
-        configModal.classList.remove('hidden');
-        configModal.classList.add('flex');
-     } else {
-         console.error("Modal config não encontrado.");
-     }
+    renderConfigLists(); if(configModal){ configModal.classList.remove('hidden'); configModal.classList.add('flex'); } else { console.error("Modal config não encontrado."); }
 };
 const renderConfigLists = () => {
-    // Expansão completa da função renderConfigLists
    const listContainer = document.getElementById('configServicosList'); if (!listContainer) return; const produtos = Array.isArray(configData.produtos)?configData.produtos:[]; if(produtos.length === 0){ listContainer.innerHTML = '<p class="tc italic p-4 text-gray-500 text-sm">Nenhum produto.</p>'; return; } produtos.sort((a,b)=>(a.name||'').localeCompare(b.name||'')); listContainer.innerHTML = produtos.map((p,i)=>`<div class="flex justify-between items-center bg-white p-3 rounded border border-gray-200 shadow-sm mb-2 hover:bg-gray-50"><span class="text-sm text-gray-800 flex-grow mr-2">${p.name} - ${formatCurrency(p.price)}</span><button class="remove-servico-btn text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100 text-xl leading-none flex-shrink-0" data-index="${i}" title="Excluir">&times;</button></div>`).join('');
 };
 const addProdutoConfig = async (e) => {
-    // Expansão completa da função addProdutoConfig
-    e.preventDefault(); const nameInput = document.getElementById('newServicoName'); const priceInput = document.getElementById('newServicoPrice'); const btn = e.target.querySelector('button[type="submit"]'); const name = nameInput?.value.trim()||''; const price = parseFloat(priceInput?.value||0); if (!name||isNaN(price)||price<=0) { showNotification("Nome e preço (>0) obrigatórios.", "error"); return; } if (!Array.isArray(configData.produtos)) configData.produtos = []; const exists = configData.produtos.some(p => p.name.toLowerCase() === name.toLowerCase()); if (exists) { showNotification(`"${name}" já existe.`, "error"); return; } if(btn) btn.disabled = true; const newProd = {name, price}; const tentativeList = [...configData.produtos, newProd]; try { if(!db) throw new Error("DB não inicializado"); await db.ref('config/produtos').set(tentativeList); configData.produtos = tentativeList; renderConfigLists(); if(nameInput) nameInput.value = ''; if(priceInput) priceInput.value = ''; showNotification(`"${name}" adicionado!`, "success"); } catch (error) { console.error("Erro add produto:", error); showNotification("Erro ao salvar.", "error"); } finally { if(btn) btn.disabled = false; }
+    e.preventDefault(); const nameInput = document.getElementById('newServicoName'); const priceInput = document.getElementById('newServicoPrice'); const btn = e.target.querySelector('button[type="submit"]'); const name = nameInput?.value.trim()||''; const price = parseFloat(priceInput?.value||0); if (!name||isNaN(price)||price<=0) { showNotification("Nome e preço (>0) obrigatórios.", "error"); return; } if (!Array.isArray(configData.produtos)) configData.produtos = []; const exists = configData.produtos.some(p => p.name.toLowerCase() === name.toLowerCase()); if (exists) { showNotification(`"${name}" já existe.`, "error"); return; } if(btn) btn.disabled = true; const newProd = {name, price}; const tentativeList = [...configData.produtos, newProd]; try { if(!db) throw new Error("DB indisponível"); await db.ref('config/produtos').set(tentativeList); configData.produtos = tentativeList; renderConfigLists(); if(nameInput) nameInput.value = ''; if(priceInput) priceInput.value = ''; showNotification(`"${name}" adicionado!`, "success"); } catch (error) { console.error("Erro add produto:", error); showNotification("Erro ao salvar.", "error"); } finally { if(btn) btn.disabled = false; }
 };
 const removeProdutoConfig = async (e) => {
-    // Expansão completa da função removeProdutoConfig
-    if (e.target.classList.contains('remove-servico-btn')) { const index = parseInt(e.target.dataset.index); if (!isNaN(index) && configData.produtos?.[index]) { const prodToRemove = configData.produtos[index]; if (confirm(`Remover "${prodToRemove.name}"?`)) { const updatedList = configData.produtos.filter((_, i) => i !== index); e.target.disabled = true; try { if(!db) throw new Error("DB não inicializado"); await db.ref('config/produtos').set(updatedList); configData.produtos = updatedList; renderConfigLists(); showNotification(`"${prodToRemove.name}" removido.`, "success"); } catch (error) { console.error("Erro remover:", error); showNotification("Erro.", "error"); e.target.disabled = false; } } } }
+    if (e.target.classList.contains('remove-servico-btn')) { const index = parseInt(e.target.dataset.index); if (!isNaN(index) && configData.produtos?.[index]) { const prodToRemove = configData.produtos[index]; if (confirm(`Remover "${prodToRemove.name}"?`)) { const updatedList = configData.produtos.filter((_, i) => i !== index); e.target.disabled = true; try { if(!db) throw new Error("DB indisponível"); await db.ref('config/produtos').set(updatedList); configData.produtos = updatedList; renderConfigLists(); showNotification(`"${prodToRemove.name}" removido.`, "success"); } catch (error) { console.error("Erro remover:", error); showNotification("Erro.", "error"); e.target.disabled = false; } } } }
 };
 
 /* ==================================================================
@@ -195,17 +277,15 @@ DASHBOARD GERENCIAL
 ==================================================================
 */
 const renderDashboardGerencial = async () => {
-    // Expansão completa da função renderDashboardGerencial
-    const cardsContainer = document.getElementById('gerencial-cards'); const rankingContainer = document.getElementById('gerencial-ranking-vendedores'); const statusContainer = document.getElementById('gerencial-pedidos-status'); if (!cardsContainer || !rankingContainer || !statusContainer) { console.warn("Elementos dashboard gerencial não encontrados."); return; } cardsContainer.innerHTML = '<p class="tc ap col-span-full">Calculando...</p>'; rankingContainer.innerHTML = '<p class="tc ap">Calculando...</p>'; statusContainer.innerHTML = '<p class="tc ap">Contando...</p>';
-    try { const pedidosArray = initialDataLoaded ? Object.values(allPedidos) : []; if (!initialDataLoaded) console.warn("Dados pedidos não carregados p/ gerencial."); const agora = new Date(); const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1); let faturamentoMes = 0, pgtoValor = 0, pgtoCount = 0; const pedidosPorStatus = STATUS_LIST.reduce((acc, s) => { acc[s] = 0; return acc; }, {}); const vendasVendedorMes = vendedores.reduce((acc, v) => { acc[v.name] = { count: 0, valor: 0 }; return acc; }, {});
+    const cardsContainer = document.getElementById('gerencial-cards'); const rankingContainer = document.getElementById('gerencial-ranking-vendedores'); const statusContainer = document.getElementById('gerencial-pedidos-status'); if (!cardsContainer || !rankingContainer || !statusContainer) { console.warn("Elementos gerencial não encontrados."); return; } cardsContainer.innerHTML = '<p class="tc ap col-span-full">Calculando...</p>'; rankingContainer.innerHTML = '<p class="tc ap">Calculando...</p>'; statusContainer.innerHTML = '<p class="tc ap">Contando...</p>';
+    try { const pedidosArray = initialDataLoaded ? Object.values(allPedidos) : []; if (!initialDataLoaded) console.warn("Dados não carregados p/ gerencial."); const agora = new Date(); const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1); let faturamentoMes = 0, pgtoValor = 0, pgtoCount = 0; const pedidosPorStatus = STATUS_LIST.reduce((acc, s) => { acc[s] = 0; return acc; }, {}); const vendasVendedorMes = vendedores.reduce((acc, v) => { acc[v.name] = { count: 0, valor: 0 }; return acc; }, {});
         pedidosArray.forEach(p => { if (p.status) pedidosPorStatus[p.status] = (pedidosPorStatus[p.status] || 0) + 1; const dataPedido = new Date(p.createdAt || 0); if (p.status === 'Entregue' && dataPedido >= inicioMes) { faturamentoMes += (p.valorTotal || 0); if (vendasVendedorMes[p.vendedorResponsavel]) { vendasVendedorMes[p.vendedorResponsavel].count++; vendasVendedorMes[p.vendedorResponsavel].valor += (p.valorTotal || 0); } } if (p.status === 'Aguardando-Pagamento') { pgtoValor += (p.valorTotal || 0); pgtoCount++; } }); const totalPedidos = pedidosArray.length;
         cardsContainer.innerHTML = `<div class="bg-white p-4 rounded-lg shadow border tc"><p class="text-xs font-medium text-gray-500 uppercase">Fat. Mês (Entr.)</p><p class="mt-1 text-2xl font-semibold text-green-600">${formatCurrency(faturamentoMes)}</p></div> <div class="bg-white p-4 rounded-lg shadow border tc"><p class="text-xs font-medium text-gray-500 uppercase">Aguard. Pgto</p><p class="mt-1 text-2xl font-semibold text-orange-600">${formatCurrency(pgtoValor)}</p><p class="text-xxs text-gray-500">(${pgtoCount} ped.)</p></div> <div class="bg-white p-4 rounded-lg shadow border tc"><p class="text-xs font-medium text-gray-500 uppercase">Pedidos Ativos</p><p class="mt-1 text-2xl font-semibold text-blue-600">${totalPedidos - (pedidosPorStatus['Entregue']||0)}</p><p class="text-xxs text-gray-500">(Total: ${totalPedidos})</p></div> <div class="bg-white p-4 rounded-lg shadow border tc"><p class="text-xs font-medium text-gray-500 uppercase">Produtos</p><p class="mt-1 text-2xl font-semibold text-gray-700">${configData.produtos?.length || 0}</p></div>`;
         const rankingArray = Object.entries(vendasVendedorMes).map(([name, data]) => ({ name, ...data })).sort((a, b) => b.valor - a.valor); if(rankingArray.length > 0 && rankingArray.some(v => v.valor > 0)) { rankingContainer.innerHTML = `<ul class="space-y-2">${rankingArray.map((v, i) => `<li class="flex justify-between items-center p-2 rounded ${i === 0 ? 'bg-yellow-100' : 'bg-gray-50'} border"><span class="font-medium text-gray-700 text-sm">${i + 1}. ${v.name}</span><span class="text-xs text-green-700 font-semibold">${formatCurrency(v.valor)} (${v.count} ped.)</span></li>`).join('')}</ul>`; } else { rankingContainer.innerHTML = '<p class="text-gray-500 italic text-sm tc">Sem vendas no mês.</p>'; }
         statusContainer.innerHTML = `<ul class="space-y-1 text-sm">${STATUS_LIST.map(s => `<li class="flex justify-between p-1 px-2 rounded hover:bg-gray-100"><span class="text-gray-600">${formatStatus(s)}:</span><span class="font-semibold text-gray-800">${pedidosPorStatus[s] || 0}</span></li>`).join('')}<li class="flex justify-between p-1 px-2 border-t mt-2 pt-2"><span class="font-bold text-gray-700">TOTAL:</span><span class="font-bold text-gray-900">${totalPedidos}</span></li></ul>`;
-    } catch (error) { console.error("Erro renderDashboardGerencial:", error); cardsContainer.innerHTML = '<p class="text-red-500 ci">Erro métricas.</p>'; rankingContainer.innerHTML = '<p class="text-red-500">Erro ranking.</p>'; statusContainer.innerHTML = '<p class="text-red-500">Erro status.</p>'; }
+    } catch (error) { console.error("Erro renderGerencial:", error); cardsContainer.innerHTML = '<p class="text-red-500 ci">Erro métricas.</p>'; rankingContainer.innerHTML = '<p class="text-red-500">Erro ranking.</p>'; statusContainer.innerHTML = '<p class="text-red-500">Erro status.</p>'; }
 };
 const switchDashboardTab = (tabId) => {
-    // Expansão completa da função switchDashboardTab
     document.querySelectorAll('.dashboard-content').forEach(c => c.classList.add('hidden')); document.querySelectorAll('.dashboard-tab').forEach(b => { b.classList.remove('active', 'text-blue-600', 'border-blue-600'); b.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-600', 'hover:border-gray-300'); }); const activeContent = document.getElementById(`${tabId}-content`); if (activeContent) activeContent.classList.remove('hidden'); const activeButton = document.querySelector(`.dashboard-tab[data-tab="${tabId}"]`); if (activeButton) { activeButton.classList.add('active', 'text-blue-600', 'border-blue-600'); activeButton.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-600', 'hover:border-gray-300'); } if(tabId === 'gerencial') renderDashboardGerencial();
 };
 
@@ -214,7 +294,6 @@ BUSCA GLOBAL
 ==================================================================
 */
 const handleGlobalSearch = () => {
-    // Expansão completa da função handleGlobalSearch
     if(!globalSearchInput || !globalSearchResults) return; const searchTerm = globalSearchInput.value.toLowerCase().trim(); if (!searchTerm) { globalSearchResults.innerHTML = ''; globalSearchResults.classList.add('hidden'); return; } const results = Object.values(allPedidos).filter(p => (p.clienteNome?.toLowerCase().includes(searchTerm)) || (p.pedidoNumero&&String(p.pedidoNumero).includes(searchTerm)) || (p.id?.toLowerCase().includes(searchTerm.replace('#',''))) || (Array.isArray(p.itens)&&p.itens.some(i=>i.name?.toLowerCase().includes(searchTerm))) || (p.vendedorResponsavel?.toLowerCase().includes(searchTerm)) ).sort((a,b)=>new Date(b.lastUpdate||b.createdAt||0)-new Date(a.lastUpdate||a.createdAt||0)).slice(0,10); if (results.length > 0) { globalSearchResults.innerHTML = results.map(p => `<div class="search-result-item p-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0 transition-colors" data-id="${p.id}"><p class="font-semibold text-sm text-gray-800 truncate">${p.clienteNome||'Cliente'} (#${p.pedidoNumero||p.id.slice(-5)})</p><p class="text-xs text-gray-500">${p.vendedorResponsavel||'N/A'} - <span class="font-medium ${p.status==='Entregue'?'text-green-600':'text-blue-600'}">${formatStatus(p.status)}</span></p></div>`).join(''); globalSearchResults.classList.remove('hidden'); } else { globalSearchResults.innerHTML = '<p class="p-3 tc text-sm text-gray-500 italic">Nenhum pedido.</p>'; globalSearchResults.classList.remove('hidden'); }
 };
 
@@ -223,7 +302,6 @@ CONFIGURAÇÃO DOS LISTENERS DE EVENTOS GERAIS
 ==================================================================
 */
 const setupEventListeners = () => {
-    // Expansão completa da função setupEventListeners
    console.log("Configurando listeners...");
 
     // Login / Logout
@@ -249,7 +327,7 @@ const setupEventListeners = () => {
     if(detailsModal){ detailsModal.addEventListener('click', (e) => { if (e.target.id === 'detailsAddServicoBtn') { const select = document.getElementById('detailsServicosList'); if (select?.value) { const [name, priceStr] = select.value.split('|'); const price = parseFloat(priceStr); if(name && !isNaN(price)){ itensAdicionadosState.push({ name, price }); renderDetailsItems(); calculateDetailsTotal(false); select.value = ""; } else { console.warn("Seleção inválida:", select.value); } } } else if (e.target.classList.contains('remove-item-btn')) { const index = parseInt(e.target.dataset.index); if (!isNaN(index) && index >= 0 && index < itensAdicionadosState.length) { itensAdicionadosState.splice(index, 1); renderDetailsItems(); calculateDetailsTotal(false); } else { console.warn("Índice inválido:", e.target.dataset.index); } } else if (e.target.id === 'gerarOfertaWhatsappBtn') { generateWhatsappOffer(); } else if (e.target.id === 'geminiRefreshBtn') { const pedidoId = document.getElementById('logPedidoId')?.value; if(pedidoId && allPedidos[pedidoId]) getGeminiSuggestions(allPedidos[pedidoId], itensAdicionadosState); } }); const descontoInput = document.getElementById('detailsDesconto'); if(descontoInput) descontoInput.addEventListener('input', () => calculateDetailsTotal(false)); else { console.warn("detailsDesconto não encontrado."); } const saveAndNextBtn = document.getElementById('saveAndNextStatusBtn'); if(saveAndNextBtn) saveAndNextBtn.addEventListener('click', () => saveDetailsAndMaybeAdvance(true)); else { console.warn("saveAndNextStatusBtn não encontrado."); } if(deleteBtn) deleteBtn.addEventListener('click', (e) => { const id = e.target.dataset.id || e.target.closest('[data-id]')?.dataset.id; const pedido = allPedidos[id]; if(pedido && confirmDeleteText && confirmDeleteBtn && confirmDeleteModal){ confirmDeleteText.innerHTML = `Excluir Pedido <strong>#${pedido.pedidoNumero||id.slice(-5)}</strong> de <strong>${pedido.clienteNome||'Cliente'}</strong>?<br><strong class="text-red-600">Irreversível.</strong>`; confirmDeleteBtn.dataset.id = id; confirmDeleteModal.classList.remove('hidden'); confirmDeleteModal.classList.add('flex'); } else { console.warn("Erro abrir confirmação exclusão."); } }); else { console.warn("deleteBtn não encontrado."); } } else { console.warn("detailsModal não encontrado."); }
 
      // Confirmação de Exclusão (Pedido)
-     if(confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', (e) => { const id = e.target.dataset.id; if (id && confirmDeleteModal) { confirmDeleteBtn.disabled = true; confirmDeleteBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin mr-2'></i> Excluindo..."; db.ref(`pedidos/${id}`).remove().then(() => { if(detailsModal) detailsModal.classList.add('hidden'); confirmDeleteModal.classList.add('hidden'); showNotification('Pedido excluído.', 'success'); }).catch(error => { console.error("Erro excluir:", error); showNotification("Erro.", "error"); }).finally(() => { confirmDeleteBtn.disabled = false; confirmDeleteBtn.innerHTML = "Sim, Excluir"; }); } }); else { console.warn("confirmDeleteBtn não encontrado."); }
+     if(confirmDeleteBtn) confirmDeleteBtn.addEventListener('click', (e) => { const id = e.target.dataset.id; if (id && confirmDeleteModal) { confirmDeleteBtn.disabled = true; confirmDeleteBtn.innerHTML = "<i class='bx bx-loader-alt bx-spin mr-2'></i> Excluindo..."; if(db) db.ref(`pedidos/${id}`).remove().then(() => { if(detailsModal) detailsModal.classList.add('hidden'); confirmDeleteModal.classList.add('hidden'); showNotification('Pedido excluído.', 'success'); }).catch(error => { console.error("Erro excluir:", error); showNotification("Erro.", "error"); }).finally(() => { confirmDeleteBtn.disabled = false; confirmDeleteBtn.innerHTML = "Sim, Excluir"; }); } }); else { console.warn("confirmDeleteBtn não encontrado."); }
      if(cancelDeleteBtn) cancelDeleteBtn.addEventListener('click', () => { if(confirmDeleteModal) confirmDeleteModal.classList.add('hidden'); }); else { console.warn("cancelDeleteBtn não encontrado."); }
 
     // Formulário de Log e Uploads
@@ -277,7 +355,6 @@ const setupEventListeners = () => {
 
     console.log("Listeners configurados.");
 };
-
 
 /* ==================================================================
 INICIALIZAÇÃO DA APLICAÇÃO

@@ -102,6 +102,7 @@
     </footer>
   </div>
 
+
   <div id="pedidoModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
     <div class="modal-content w-full max-w-xl">
       <div class="modal-header">
@@ -135,10 +136,8 @@
   <div id="lightbox" class="modal fixed inset-0 z-[100] hidden items-center justify-center p-4 modal-backdrop"><div class="absolute inset-0" id="lightbox-close-bg"></div><div class="relative bg-black bg-opacity-75 p-4 rounded-lg max-w-4xl max-h-[90vh] w-auto"><div id="lightbox-content" class="flex items-center justify-center overflow-auto max-h-[calc(90vh-4rem)]"></div><button id="lightbox-close" class="absolute -top-3 -right-3 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center text-2xl shadow-lg border-2 border-gray-300">&times;</button></div></div>
   <div id="confirmDeleteModal" class="modal fixed inset-0 z-[101] hidden items-center justify-center p-4 modal-backdrop"><div class="modal-content w-full max-w-md"><div class="modal-header items-center"><i class='bx bxs-error-circle text-red-600 text-3xl mr-3'></i><h2 class="text-xl font-bold text-gray-800">Confirmar</h2></div><div class="modal-body"><p id="confirmDeleteText" class="text-center text-gray-700"></p></div><div class="modal-footer"><button id="cancelDeleteBtn" class="btn btn-gray">Cancelar</button><button id="confirmDeleteBtn" class="btn btn-red">Excluir</button></div></div></div>
 
-  {/* DIV VAZIA PARA NOTIFICAÇÕES SEREM INSERIDAS PELO JS */}
   <div id="notification-container" class="fixed bottom-0 right-0 p-4 space-y-2 z-[9999]"></div>
 
-  {/* Scripts Firebase e App */}
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <script src="js/app_setup.js"></script>

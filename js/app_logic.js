@@ -360,7 +360,10 @@ const setupEventListeners = () => {
 INICIALIZAÇÃO DA APLICAÇÃO
 ==================================================================
 */
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', () => { checkLoggedInUser(); setupEventListeners(); }); }
-else { checkLoggedInUser(); setupEventListeners(); }
+// --- BLOCO REMOVIDO ---
+// O bloco if(document.readyState === 'loading') { ... } foi removido.
+// A inicialização agora é controlada EXCLUSIVAMENTE pelo app_setup.js,
+// que chama setupEventListeners() DENTRO de listenToPedidos() após
+// a carga inicial dos dados, resolvendo a race condition.
 
 // --- FIM DO CÓDIGO ---

@@ -1,11 +1,11 @@
-* ==================================================================
+/* ==================================================================
 PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 2: LÓGICA
 Versão: FINAL COMPLETA e CORRIGIDA (Listeners Fix) - 23/10/2025
 ==================================================================
 */
 
 // Este arquivo DEPENDE das variáveis e funções definidas em app_setup.js
-// Este arquivo deve ser carregado ANTES de app_setup.js no index.html
+// Garanta que este arquivo (app_logic.js) seja carregado ANTES de app_setup.js no index.html // <--- CORREÇÃO NO COMENTÁRIO
 
 /* ==================================================================
 FUNÇÕES DE MANIPULAÇÃO DE PEDIDOS
@@ -402,3 +402,4 @@ INICIALIZAÇÃO DA APLICAÇÃO (BLOCO REMOVIDO)
 // A inicialização é controlada exclusivamente pelo app_setup.js
 
 // --- FIM DO CÓDIGO ---
+

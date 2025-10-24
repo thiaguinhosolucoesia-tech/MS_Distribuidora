@@ -12,17 +12,22 @@
 </head>
 <body class="bg-gray-100">
 
+  <!-- Tela de Login -->
   <div id="userScreen" class="flex items-center justify-center min-h-screen p-4">
     <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
       <img src="images/logo_eletroia.png" alt="Logo EletroIA" class="mx-auto mb-4 h-12">
       <p class="text-xl font-semibold text-orange-600">Construindo Parcerias, Distribuindo Soluções</p>
       <p class="text-gray-500 my-8">Acesso ao Painel de Vendas</p>
       <div id="userList" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <!-- Vendedores são carregados aqui pelo JS -->
       </div>
     </div>
   </div>
 
+  <!-- Aplicação Principal (Oculta por padrão) -->
   <div id="app" class="hidden flex flex-col min-h-screen">
+    
+    <!-- Cabeçalho -->
     <header class="bg-white shadow-md sticky top-0 z-40">
       <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center gap-4 flex-wrap">
         <div class="flex items-center gap-3">
@@ -51,6 +56,7 @@
       </div>
     </header>
 
+     <!-- Navegação de Abas -->
      <nav id="dashboard-nav" class="bg-gray-100 border-b border-gray-300 sticky top-[68px] z-30 hidden">
         <div class="container mx-auto px-4 sm:px-6 lg:px-8">
             <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
@@ -68,32 +74,41 @@
         </div>
     </nav>
 
+    <!-- Conteúdo Principal -->
     <main class="container mx-auto p-4 sm:p-6 lg:px-8 flex-grow">
+      
+      <!-- Aba Vendas (Kanban) -->
       <div id="vendas-content" class="dashboard-content">
           <h2 id="dashboard-title" class="text-xl font-semibold mb-4 text-gray-700"></h2>
           <div id="vendedorDashboard" class="flex flex-col gap-10">
+            <!-- Seções dos vendedores e colunas do Kanban são geradas aqui -->
           </div>
       </div>
 
+      <!-- Aba Gerencial -->
       <div id="gerencial-content" class="dashboard-content hidden">
           <h2 class="text-xl font-semibold mb-6 text-gray-700">Painel Gerencial</h2>
           <div id="dashboardGerencialContent" class="space-y-6">
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" id="gerencial-cards">
+                <!-- Cards de Métricas (Fat. Mês, Aguard. Pgto, etc) -->
               </div>
               <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
                  <h3 class="text-lg font-semibold mb-3 text-gray-800">Ranking Vendedores (Mês Atual)</h3>
                  <div id="gerencial-ranking-vendedores">
+                   <!-- Ranking de Vendedores -->
                  </div>
               </div>
               <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
                  <h3 class="text-lg font-semibold mb-3 text-gray-800">Pedidos por Status</h3>
                  <div id="gerencial-pedidos-status">
+                   <!-- Gráfico/Lista de Pedidos por Status -->
                  </div>
               </div>
           </div>
       </div>
     </main>
 
+     <!-- Rodapé -->
      <footer class="bg-gray-800 text-gray-300 mt-8 py-4">
         <div class="container mx-auto px-4 text-center text-xs sm:text-sm">
             <p>&copy; 2025 EletroIA Distribuidora Inteligente - by thIAguinho Soluções</p>
@@ -102,6 +117,7 @@
   </div>
 
 
+  <!-- Modal: Novo Pedido -->
   <div id="pedidoModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
     <div class="modal-content w-full max-w-xl">
       <div class="modal-header">
@@ -121,6 +137,7 @@
     </div>
   </div>
 
+  <!-- Modal: Detalhes do Pedido -->
   <div id="detailsModal" class="modal fixed inset-0 z-50 hidden items-start justify-center p-4 modal-backdrop">
      <div class="modal-content w-full max-w-6xl">
       <div class="modal-header"><div class="flex justify-between items-start w-full"><div><h2 id="detailsClienteNome" class="text-2xl font-bold text-gray-800"></h2><p id="detailsPedidoNumero" class="text-sm font-bold text-blue-800"></p></div><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div></div>
@@ -128,19 +145,27 @@
     </div>
   </div>
 
+  <!-- Modal: Configuração (Produtos) -->
   <div id="configModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
       <div class="modal-content w-full max-w-3xl"><div class="modal-header"><h2 class="text-2xl font-bold text-gray-800">⚙️ Gerenciar Produtos</h2><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div><div class="modal-body"><div><h3 class="section-title">Catálogo</h3><div id="configServicosList" class="space-y-2 mb-4 max-h-60 overflow-y-auto border p-2 rounded bg-gray-50"></div><form id="addServicoForm" class="flex flex-wrap gap-2 border-t pt-4"><input type="text" id="newServicoName" placeholder="Nome Produto/Serviço" class="p-2 border rounded flex-grow min-w-[200px] bg-white focus:ring-blue-500 focus:border-blue-500" required><input type="number" id="newServicoPrice" placeholder="Preço" class="p-2 border rounded w-full sm:w-auto bg-white focus:ring-blue-500 focus:border-blue-500" required step="0.01" min="0"><button type="submit" class="btn btn-blue w-full sm:w-auto">Adicionar</button></form></div></div><div class="modal-footer"><button type="button" class="btn-close-modal btn btn-gray">Fechar</button></div></div>
   </div>
 
+  <!-- Modal: Lightbox (Ver Mídia) -->
   <div id="lightbox" class="modal fixed inset-0 z-[100] hidden items-center justify-center p-4 modal-backdrop"><div class="absolute inset-0" id="lightbox-close-bg"></div><div class="relative bg-black bg-opacity-75 p-4 rounded-lg max-w-4xl max-h-[90vh] w-auto"><div id="lightbox-content" class="flex items-center justify-center overflow-auto max-h-[calc(90vh-4rem)]"></div><button id="lightbox-close" class="absolute -top-3 -right-3 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center text-2xl shadow-lg border-2 border-gray-300">&times;</button></div></div>
+  
+  <!-- Modal: Confirmar Exclusão -->
   <div id="confirmDeleteModal" class="modal fixed inset-0 z-[101] hidden items-center justify-center p-4 modal-backdrop"><div class="modal-content w-full max-w-md"><div class="modal-header items-center"><i class='bx bxs-error-circle text-red-600 text-3xl mr-3'></i><h2 class="text-xl font-bold text-gray-800">Confirmar</h2></div><div class="modal-body"><p id="confirmDeleteText" class="text-center text-gray-700"></p></div><div class="modal-footer"><button id="cancelDeleteBtn" class="btn btn-gray">Cancelar</button><button id="confirmDeleteBtn" class="btn btn-red">Excluir</button></div></div></div>
 
+  <!-- Container de Notificações -->
   <div id="notification-container" class="fixed bottom-0 right-0 p-4 space-y-2 z-[9999]"></div>
 
+  <!-- Scripts Firebase -->
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <script src="js/app_setup.js"></script>
-  <script src="js/app_logic.js"></script>
+  
+  <!-- Scripts da Aplicação (ORDEM CORRIGIDA) -->
+  <script src="js/app_logic.js"></script> <!-- Define as funções -->
+  <script src="js/app_setup.js"></script> <!-- Executa a inicialização -->
 
 </body>
 </html>

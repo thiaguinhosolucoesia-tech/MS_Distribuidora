@@ -145,7 +145,7 @@ const loadVendedores = async () => {
             console.log("Vendedores carregados:", vendedores);
         } else {
              console.warn("Nenhum vendedor no Firebase ou formato inválido. Usando simulação.");
-             vendedores = [{ name: 'Thiago', role: 'Vendedor 1' }, { name: 'Raul', role: 'Vendedor 2' }, { name: 'Guilherme', role: 'Gestor' }];
+             vendedores = [{ name: 'Thiago Ventura Valencio', role: 'Vendedor 1' }, { name: 'Mauro Andrigo', role: 'Vendedor 2' }, { name: 'Raul', role: 'Gestor' }];
         }
          if(vendedores.length === 0){ console.error("CRÍTICO: Lista vendedores vazia."); showNotification("Erro: Vendedores não configurados.", "error"); }
      } catch (error) { console.error("Erro loadVendedores:", error); showNotification("Erro carregar vendedores.", "error"); vendedores = []; }

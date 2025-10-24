@@ -360,10 +360,45 @@ const setupEventListeners = () => {
 INICIALIZAÇÃO DA APLICAÇÃO
 ==================================================================
 */
-// --- BLOCO REMOVIDO ---
-// O bloco if(document.readyState === 'loading') { ... } foi removido.
-// A inicialização agora é controlada EXCLUSIVAMENTE pelo app_setup.js,
-// que chama setupEventListeners() DENTRO de listenToPedidos() após
-// a carga inicial dos dados, resolvendo a race condition.
+if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', () => { checkLoggedInUser(); setupEventListeners(); }); }
+else { checkLoggedInUser(); setupEventListeners(); }
+
+
+/* ==== PATCHED INIT: ensure single init and wait for data ==== */
+let _setupCalled = false;
+async function safeInitializeApp() {
+  if (_setupCalled) return;
+  _setupCalled = true;
+  try {
+    if (!ELETROIA_ENV.hasFirebaseConfig) {
+      criticalError("Config do Firebase não detectada. Verifique a configuração em app_setup.js");
+      return;
+    }
+    // Caso precise aguardar carga inicial de dados do DB antes de ativar listeners
+    const waitForData = () => new Promise((res) => {
+      const t0 = Date.now();
+      const check = () => {
+        if (initialDataLoaded) return res(true);
+        if (Date.now()-t0 > 5000) return res(false); // timeout 5s
+        setTimeout(check, 200);
+      };
+      check();
+    });
+    const loaded = await waitForData();
+    if (!loaded) console.warn("initialDataLoaded não foi sinalizado em 5s — continuando com listeners.");
+    setupEventListeners();
+  } catch (e) {
+    console.error("Erro na inicialização segura:", e);
+    showNotification('Erro na inicialização. Veja console.', 'error');
+  }
+}
+/* Chama safeInitializeApp no load do DOM */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', safeInitializeApp);
+} else {
+  safeInitializeApp();
+}
+/* ==== PATCHED INIT END ==== */
+
 
 // --- FIM DO CÓDIGO ---

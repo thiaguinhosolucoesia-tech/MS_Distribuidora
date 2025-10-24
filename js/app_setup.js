@@ -174,44 +174,44 @@ const loginUser = async (user) => {
 
 const checkLoggedInUser = async () => {
     // Esta função é 'async' pois depende de 'loadVendedores'
-    await loadVendedores(); 
-    const storedUser = localStorage.getItem('eletroIAUser'); 
-    if (storedUser) { 
-        try { 
-            const parsedUser = JSON.parse(storedUser); 
-            if(vendedores.some(v => v.name === parsedUser.name)){ 
+    await loadVendedores();
+    const storedUser = localStorage.getItem('eletroIAUser');
+    if (storedUser) {
+        try {
+            const parsedUser = JSON.parse(storedUser);
+            if(vendedores.some(v => v.name === parsedUser.name)){
                 loginUser(parsedUser); // Usuário já logado, entra direto
-            } else { 
-                console.warn("Usuário salvo inválido."); 
-                localStorage.removeItem('eletroIAUser'); 
+            } else {
+                console.warn("Usuário salvo inválido.");
+                localStorage.removeItem('eletroIAUser');
                 displayLoginScreen(); // Usuário salvo não existe mais, mostra login
-            } 
-        } catch(e) { 
-            console.error("Erro parse usuário:", e); 
-            localStorage.removeItem('eletroIAUser'); 
+            }
+        } catch(e) {
+            console.error("Erro parse usuário:", e);
+            localStorage.removeItem('eletroIAUser');
             displayLoginScreen(); // Erro, mostra login
-        } 
-    } else { 
+        }
+    } else {
         displayLoginScreen(); // Nenhum usuário salvo, mostra login
     }
 };
 
 const displayLoginScreen = () => {
      if(userScreen) userScreen.classList.remove('hidden'); if(app) app.classList.add('hidden');
-     if (userList) { 
-         if(vendedores.length > 0){ 
-            userList.innerHTML = vendedores.map(user => 
-                `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'> 
-                  <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p> 
-                  <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p> 
+     if (userList) {
+         if(vendedores.length > 0){
+            userList.innerHTML = vendedores.map(user =>
+                `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'>
+                  <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p>
+                  <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p>
                 </div>`
-            ).join(''); 
-        } else { 
-            userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; 
-        } 
-    } else { 
-        console.error("userList não encontrado."); 
-        if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login."); 
+            ).join('');
+        } else {
+            userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>';
+        }
+    } else {
+        console.error("userList não encontrado.");
+        if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login.");
     }
 };
 
@@ -257,7 +257,7 @@ const listenToPedidos = () => {
     // A flag 'listenersAttached' é controlada pelo bloco de inicialização (startApp)
     if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>'); }
     else { console.error("Dashboard não encontrado."); return; } allPedidos = {};
-    
+
     ref.once('value', snapshot => {
         allPedidos = snapshot.val() || {}; Object.keys(allPedidos).forEach(key => { if(allPedidos[key]) allPedidos[key].id = key; });
         if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = ''); }
@@ -275,6 +275,7 @@ const listenToPedidos = () => {
              if (typeof setupEventListeners === 'function') {
                 setupEventListeners();
                 listenersAttached = true;
+                console.log("Listeners de clique anexados como fallback.");
              } else {
                 showNotification("Erro: Falha ao carregar interações.", "error");
              }
@@ -300,34 +301,46 @@ const loadConfig = async () => {
 
 
 /* ==================================================================
-INICIALIZAÇÃO DA APLICAÇÃO (BLOCO CORRIGIDO)
+INICIALIZAÇÃO DA APLICAÇÃO (BLOCO CORRIGIDO FINAL)
 ==================================================================
 */
 
 // Função unificada de inicialização
-const startApp = async () => { // <--- CORREÇÃO: Adicionado 'async'
-    
+const startApp = async () => { // <--- Adicionado 'async'
+    console.log("Iniciando startApp...");
      // 1. ESPERA (await) a checagem de login terminar
      //    Isso garante que loadVendedores() e displayLoginScreen() já rodaram.
-     await checkLoggedInUser(); // <--- CORREÇÃO: Adicionado 'await'
-     
+     try {
+        await checkLoggedInUser(); // <--- Adicionado 'await'
+        console.log("checkLoggedInUser concluído.");
+     } catch (error) {
+         console.error("Erro durante checkLoggedInUser:", error);
+         showNotification("Erro crítico ao iniciar. Tente recarregar.", "error");
+         return; // Interrompe se o login falhar criticamente
+     }
+
      // 2. Anexa TODOS os listeners de eventos (incluindo o userList da tela de login)
      //    A verificação 'typeof' garante que app_logic.js foi carregado
      if (typeof setupEventListeners === 'function') {
-        setupEventListeners();
+        setupEventListeners(); // Chama a função que está em app_logic.js
         listenersAttached = true; // Informa o 'listenToPedidos' que já foi executado.
+        console.log("setupEventListeners chamado.");
      } else {
         console.error("ERRO CRÍTICO: app_logic.js não carregou a função setupEventListeners.");
         showNotification("Erro: Falha ao carregar interações.", "error");
      }
+     console.log("startApp finalizado.");
 };
 
 // Garante que o DOM esteja pronto ANTES de tentar configurar listeners ou checar login
 if (document.readyState === 'loading') {
+    console.log("DOM loading, aguardando DOMContentLoaded...");
     document.addEventListener('DOMContentLoaded', startApp);
 } else {
     // DOM já pronto, chama a inicialização
+    console.log("DOM pronto, chamando startApp diretamente.");
     startApp();
 }
 
 // --- FIM app_setup.js ---
+

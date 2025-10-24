@@ -9,6 +9,8 @@ body {
     --primary-hover: #2563eb; /* blue-600 */
     --secondary-color: #f97316; /* orange-500 */
 }
+.tc { text-align: center; }
+.ap { animate-pulse; }
 
 /* =============== LAYOUT DO DASHBOARD =============== */
 #vendedorDashboard { display: flex; flex-direction: column; gap: 2.5rem; }
@@ -79,6 +81,7 @@ body {
 #detailsHistoricoCliente .historico-item:last-child { border-bottom: none; }
 #assistenteVendasOutput ul { list-style: disc; padding-left: 1.5rem; }
 #assistenteVendasOutput li { margin-bottom: 0.5rem; }
+.text-xxs { font-size: 0.65rem; line-height: 0.9rem; }
 
 /* =============== GALERIA E LIGHTBOX =============== */
 .thumbnail-container { position: relative; aspect-ratio: 1 / 1; border: 1px solid #d1d5db; }
@@ -89,8 +92,27 @@ body {
 #lightbox-content { min-height: 200px; }
 
 /* =============== NOTIFICAÇÕES =============== */
-.notification { position: fixed; bottom: 1rem; right: 1rem; /* MUDADO PARA INFERIOR */ padding: 0.75rem 1.25rem; border-radius: 6px; color: white; font-weight: 500; z-index: 9999; transform: translateY(150%); /* Ajustado para baixo */ transition: transform 0.3s ease, box-shadow 0.3s ease; max-width: 320px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); font-size: 0.875rem; }
-.notification.show { transform: translateY(0); } /* Ajustado */
+/* Corrigido para usar o container dedicado e posicionamento */
+#notification-container {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  padding: 1rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column-reverse; /* Novas notificações aparecem em cima */
+  gap: 0.5rem;
+  max-width: 350px;
+}
+.notification { 
+  padding: 0.75rem 1.25rem; border-radius: 6px; color: white; font-weight: 500; 
+  transform: translateX(120%);
+  transition: transform 0.3s ease, box-shadow 0.3s ease; 
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); 
+  font-size: 0.875rem; 
+  width: 100%;
+}
+.notification.show { transform: translateX(0); }
 .notification.success { background-color: #10b981; }
 .notification.error { background-color: #ef4444; }
 .notification.warning { background-color: #f59e0b; }

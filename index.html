@@ -1,147 +1,305 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>EletroIA - Distribuidora Inteligente v1.1</title>
+/* ==== PATCHED START: safety & env guards ====
+  - Verifica variáveis essenciais (Firebase, Cloudinary, GEMINI)
+  - Define flags de disponibilidade para UI/funcionalidades
+  - Mantém compatibilidade com o restante do código
+*/
+const ELETROIA_ENV = {
+  hasFirebaseConfig: typeof firebaseConfig !== 'undefined',
+  hasCloudinary: typeof CLOUDINARY_CLOUD_NAME !== 'undefined' && typeof CLOUDINARY_UPLOAD_PRESET !== 'undefined',
+  hasGeminiKey: typeof GEMINI_API_KEY !== 'undefined' && GEMINI_API_KEY && !GEMINI_API_KEY.includes('COLE_SUA')
+};
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="css/styles.css">
-</head>
-<body class="bg-gray-100">
+// Se firebaseConfig não existir por algum motivo, define placeholder e bloqueia ações sensíveis.
+if (!ELETROIA_ENV.hasFirebaseConfig) {
+  console.warn("Firebase config ausente. Muitas funcionalidades serão desabilitadas.");
+  window.firebaseConfig = window.firebaseConfig || {};
+}
 
-  <div id="userScreen" class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md text-center">
-      <img src="images/logo_eletroia.png" alt="Logo EletroIA" class="mx-auto mb-4 h-12">
-      <p class="text-xl font-semibold text-orange-600">Construindo Parcerias, Distribuindo Soluções</p>
-      <p class="text-gray-500 my-8">Acesso ao Painel de Vendas</p>
-      <div id="userList" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      </div>
-    </div>
-  </div>
+// Ajuste de UX: função para mostrar erro crítico e desabilitar formulários
+function criticalError(message) {
+  console.error("CRITICAL:", message);
+  showNotification(message, 'error');
+  // desabilitar botões principais se existirem
+  document.querySelectorAll('button, input, textarea').forEach(el => el.disabled = true);
+}
+/* ==== PATCHED END ==== */
 
-  <div id="app" class="hidden flex flex-col min-h-screen">
-    <header class="bg-white shadow-md sticky top-0 z-40">
-      <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-3 flex justify-between items-center gap-4 flex-wrap">
-        <div class="flex items-center gap-3">
-            <img src="images/logo_eletroia.png" alt="Logo EletroIA" class="h-10">
-        </div>
-        <div class="flex-grow max-w-lg relative search-container order-3 sm:order-2 w-full sm:w-auto mt-2 sm:mt-0">
-            <input type="search" id="globalSearchInput" placeholder="Buscar Cliente, Pedido# ou Produto..." class="w-full p-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm">
-            <div id="globalSearchResults" class="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-b-md shadow-lg z-50 hidden max-h-60 overflow-y-auto">
-            </div>
-        </div>
-        <div class="flex items-center gap-2 sm:gap-4 order-2 sm:order-3">
-          <button id="toggleAgendaBtn" class="btn bg-white border border-gray-300 text-gray-700 hover:bg-gray-100 px-3 py-2 flex items-center gap-1 sm:gap-2" title="Alternar visão: Todos / Meus Pedidos">
-            <i class='bx bx-user-pin'></i><span class="hidden md:inline">Minha Agenda</span>
-          </button>
-          <button id="configBtn" class="btn bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 flex items-center gap-1 sm:gap-2 hidden" title="Gerenciar Produtos">
-            <i class='bx bx-cog'></i><span class="hidden md:inline">Produtos</span>
-          </button>
-          <button id="addPedidoBtn" class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 sm:px-4 flex items-center gap-1 sm:gap-2" title="Criar Novo Pedido">
-            <i class='bx bx-plus-circle'></i><span class="hidden sm:inline">Novo Pedido</span>
-          </button>
-          <div class="text-right">
-            <p id="currentUserName" class="font-semibold text-gray-700 text-sm sm:text-base truncate max-w-[100px] sm:max-w-[150px]"></p>
-            <button id="logoutButton" class="text-xs sm:text-sm text-red-500 hover:text-red-700 hover:underline">Sair</button>
-          </div>
-        </div>
-      </div>
-    </header>
+/* ==================================================================
+PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 1: SETUP
+Versão: FINAL COMPLETA e CORRIGIDA (Listener Timing Fix) - 23/10/2025
+==================================================================
+*/
 
-     <nav id="dashboard-nav" class="bg-gray-100 border-b border-gray-300 sticky top-[68px] z-30 hidden">
-        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-            <ul class="flex flex-wrap -mb-px text-sm font-medium text-center text-gray-500">
-                <li class="mr-2">
-                    <button data-tab="vendas" class="dashboard-tab inline-block p-3 sm:p-4 border-b-2 rounded-t-lg text-blue-600 border-blue-600 active" aria-current="page">
-                       <i class='bx bx-columns mr-1'></i> Vendas (Kanban)
-                    </button>
-                </li>
-                <li class="mr-2 hidden" id="tab-btn-gerencial">
-                    <button data-tab="gerencial" class="dashboard-tab inline-block p-3 sm:p-4 border-b-2 border-transparent rounded-t-lg hover:text-gray-600 hover:border-gray-300">
-                        <i class='bx bxs-dashboard mr-1'></i> Painel Gerencial
-                    </button>
-                </li>
-            </ul>
-        </div>
-    </nav>
+/* ==================================================================
+!!! CREDENCIAIS REAIS INSERIDAS !!!
+==================================================================
+*/
+const firebaseConfig = {
+  apiKey: "AIzaSyB6mJ6Rpkb7toXJmG3fEHejC8Xctn6D8wg",
+  authDomain: "eletroia-distribuidora.firebaseapp.com",
+  databaseURL: "https://eletroia-distribuidora-default-rtdb.firebaseio.com",
+  projectId: "eletroia-distribuidora",
+  storageBucket: "eletroia-distribuidora.appspot.com",
+  messagingSenderId: "579178573325",
+  appId: "1:579178573325:web:b1b2295f9dbb0aa2252f44"
+};
 
-    <main class="container mx-auto p-4 sm:p-6 lg:px-8 flex-grow">
-      <div id="vendas-content" class="dashboard-content">
-          <h2 id="dashboard-title" class="text-xl font-semibold mb-4 text-gray-700"></h2>
-          <div id="vendedorDashboard" class="flex flex-col gap-10">
-          </div>
-      </div>
+const CLOUDINARY_CLOUD_NAME = "dpaayfwlj";
+const CLOUDINARY_UPLOAD_PRESET = "eletroia_unsigned";
 
-      <div id="gerencial-content" class="dashboard-content hidden">
-          <h2 class="text-xl font-semibold mb-6 text-gray-700">Painel Gerencial</h2>
-          <div id="dashboardGerencialContent" class="space-y-6">
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6" id="gerencial-cards">
-              </div>
-              <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
-                 <h3 class="text-lg font-semibold mb-3 text-gray-800">Ranking Vendedores (Mês Atual)</h3>
-                 <div id="gerencial-ranking-vendedores">
-                 </div>
-              </div>
-              <div class="bg-white p-4 rounded-lg shadow border border-gray-200">
-                 <h3 class="text-lg font-semibold mb-3 text-gray-800">Pedidos por Status</h3>
-                 <div id="gerencial-pedidos-status">
-                 </div>
-              </div>
-          </div>
-      </div>
-    </main>
+// !!! ATENÇÃO: INSEGURANÇA !!!
+const GEMINI_API_KEY = "COLE_SUA_GEMINI_API_KEY_AQUI"; // <<<<<<<<<<<<<<< SUBSTITUA AQUI
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+/* ==================================================================
+FIM DA SEÇÃO DE CREDENCIAIS
+==================================================================
+*/
 
-     <footer class="bg-gray-800 text-gray-300 mt-8 py-4">
-        <div class="container mx-auto px-4 text-center text-xs sm:text-sm">
-            <p>&copy; 2025 EletroIA Distribuidora Inteligente - by thIAguinho Soluções</p>
-        </div>
-    </footer>
-  </div>
+/* ==================================================================
+SISTEMA DE NOTIFICAÇÕES
+==================================================================
+*/
+function showNotification(message, type = 'success') {
+  const existingNotifications = document.querySelectorAll('.notification');
+  existingNotifications.forEach(notif => notif.remove());
+  const notification = document.createElement('div');
+  notification.id = 'notification';
+  notification.className = `notification ${type}`;
+  notification.textContent = message;
+  const container = document.getElementById('notification-container'); // Usa o container dedicado
+  if (container) {
+    container.appendChild(notification);
+    void notification.offsetWidth;
+    notification.classList.add('show');
+    setTimeout(() => {
+      notification.classList.remove('show');
+      notification.addEventListener('transitionend', () => {
+        if (container.contains(notification)) container.removeChild(notification);
+      }, { once: true });
+    }, 4000);
+  } else { console.error("Container de notificações não encontrado."); }
+}
+
+/* ==================================================================
+UPLOAD DE ARQUIVOS
+==================================================================
+*/
+const uploadFileToCloudinary = async (file) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+  const apiUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/auto/upload`;
+  try {
+    showNotification(`Enviando ${file.name}...`, 'warning');
+    const response = await fetch(apiUrl, { method: 'POST', body: formData });
+    if (!response.ok) {
+       const errorData = await response.json(); console.error("Erro Cloudinary:", errorData);
+       throw new Error(errorData.error?.message || `Falha no upload (${response.status})`);
+    }
+    const data = await response.json();
+    showNotification(`'${file.name}' enviado!`, 'success');
+    return data.secure_url;
+  } catch (error) {
+    console.error("Erro no upload Cloudinary:", error);
+    showNotification(`Erro upload ${file.name}: ${error.message}`, 'error');
+    throw error;
+  }
+};
+
+/* ==================================================================
+INICIALIZAÇÃO DO SISTEMA E ESTADO GLOBAL
+==================================================================
+*/
+// Estado
+let currentUser = null, allPedidos = {}, configData = { produtos: [] }, vendedores = [];
+let lightboxMedia = [], currentLightboxIndex = 0, filesToUpload = [], initialDataLoaded = false;
+let itensAdicionadosState = [];
+let isMyAgendaViewActive = false;
+let listenersAttached = false; // Flag para garantir que listeners sejam anexados só uma vez
+
+// Constantes
+const FORMAS_PAGAMENTO = ['PIX', 'Boleto', 'Cartão de Crédito', 'Dinheiro', 'Transferência'];
+const STATUS_LIST = ['Novos-Leads', 'Em-Negociacao', 'Aguardando-Pagamento', 'Entregue'];
+const CROSS_SELL_RULES = {
+    "Disjuntor Steck": ["Caixa de Passagem Steck", "Fita Isolante"],
+    "Cabo Flexível": ["Eletroduto Corrugado", "Conector Wago"],
+    "Tomada Dupla": ["Placa 4x2", "Interruptor Simples"]
+};
+const FREQUENCY_ALERT_DAYS = 45;
+
+// Seletores DOM (Cache)
+const userScreen = document.getElementById('userScreen'), app = document.getElementById('app'), userList = document.getElementById('userList'),
+      vendedorDashboard = document.getElementById('vendedorDashboard'), addPedidoBtn = document.getElementById('addPedidoBtn'),
+      logoutButton = document.getElementById('logoutButton'), pedidoModal = document.getElementById('pedidoModal'),
+      pedidoForm = document.getElementById('pedidoForm'), detailsModal = document.getElementById('detailsModal'),
+      deleteBtn = document.getElementById('deleteBtn'), configBtn = document.getElementById('configBtn'),
+      configModal = document.getElementById('configModal'), logForm = document.getElementById('logForm'),
+      lightbox = document.getElementById('lightbox'), mediaInput = document.getElementById('media-input'),
+      globalSearchInput = document.getElementById('globalSearchInput'), globalSearchResults = document.getElementById('globalSearchResults'),
+      confirmDeleteModal = document.getElementById('confirmDeleteModal'), confirmDeleteBtn = document.getElementById('confirmDeleteBtn'),
+      cancelDeleteBtn = document.getElementById('cancelDeleteBtn'), confirmDeleteText = document.getElementById('confirmDeleteText'),
+      openCameraBtn = document.getElementById('openCameraBtn'), openGalleryBtn = document.getElementById('openGalleryBtn'),
+      fileNameDisplay = document.getElementById('fileName'), lightboxClose = document.getElementById('lightbox-close'),
+      toggleAgendaBtn = document.getElementById('toggleAgendaBtn'), dashboardNav = document.getElementById('dashboard-nav'),
+      dashboardTitle = document.getElementById('dashboard-title');
+
+// Funções Utilitárias
+const formatCurrency = (value) => `R$ ${parseFloat(value || 0).toFixed(2).replace('.', ',')}`;
+const formatStatus = (status) => status ? status.replace(/-/g, ' ') : 'Status Inválido';
+const formatDate = (isoString) => isoString ? new Date(isoString).toLocaleDateString('pt-BR') : 'Data Inválida';
+const formatDateTime = (isoString) => isoString ? new Date(isoString).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'}) : 'Data/Hora Inválida';
+
+// --- Inicialização do Firebase ---
+let db;
+try {
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); console.log("Firebase inicializado."); }
+    else { firebase.app(); console.log("Firebase já inicializado."); }
+    db = firebase.database();
+} catch(e) { console.error("Erro CRÍTICO Firebase:", e); setTimeout(() => showNotification("Erro crítico: Falha Firebase.", "error"), 500); throw new Error("Falha Firebase."); }
+
+/* ==================================================================
+LÓGICA DE LOGIN E AUTENTICAÇÃO
+==================================================================
+*/
+const loadVendedores = async () => {
+     try {
+        if (!db) throw new Error("DB Firebase não disponível.");
+        const snapshot = await db.ref('vendedores').once('value');
+        const vendedoresData = snapshot.val();
+        if (vendedoresData && typeof vendedoresData === 'object' && Object.keys(vendedoresData).length > 0) {
+            vendedores = Object.entries(vendedoresData).map(([key, value]) => ({ id: key, name: value.name || key, role: value.role || 'Vendedor' }));
+            console.log("Vendedores carregados:", vendedores);
+        } else {
+             console.warn("Nenhum vendedor no Firebase ou formato inválido. Usando simulação.");
+             vendedores = [{ name: 'Thiago', role: 'Vendedor 1' }, { name: 'Raul', role: 'Vendedor 2' }, { name: 'Guilherme', role: 'Gestor' }];
+        }
+         if(vendedores.length === 0){ console.error("CRÍTICO: Lista vendedores vazia."); showNotification("Erro: Vendedores não configurados.", "error"); }
+     } catch (error) { console.error("Erro loadVendedores:", error); showNotification("Erro carregar vendedores.", "error"); vendedores = []; }
+};
+
+const loginUser = async (user) => {
+    if (!user?.name) { console.error("Login inválido:", user); return; }
+    currentUser = user; localStorage.setItem('eletroIAUser', JSON.stringify(user));
+    const userNameDisplay = document.getElementById('currentUserName'); if(userNameDisplay) userNameDisplay.textContent = user.name;
+    const isGestor = user.role?.toLowerCase().includes('gestor');
+    if(configBtn) configBtn.classList.toggle('hidden', !isGestor);
+    const tabBtnGerencial = document.getElementById('tab-btn-gerencial'); if(tabBtnGerencial) tabBtnGerencial.classList.toggle('hidden', !isGestor);
+    if(dashboardNav) dashboardNav.classList.remove('hidden');
+    if(userScreen) userScreen.classList.add('hidden'); if(app) app.classList.remove('hidden');
+    if(vendedorDashboard) vendedorDashboard.innerHTML = '<p class="text-center tc my-10 animate-pulse">Carregando...</p>';
+
+    await loadConfig();
+    initializeDashboard(); // Prepara a estrutura do dashboard
+    listenToPedidos(); // Inicia o carregamento e monitoramento dos pedidos (que chamará setupEventListeners)
+
+    // A chamada setupEventListeners() FOI MOVIDA para dentro de listenToPedidos,
+    // para garantir que execute APÓS a carga inicial e renderização.
+
+    if (isGestor) renderDashboardGerencial(); else switchDashboardTab('vendas');
+};
+
+const checkLoggedInUser = async () => {
+    await loadVendedores(); const storedUser = localStorage.getItem('eletroIAUser'); if (storedUser) { try { const parsedUser = JSON.parse(storedUser); if(vendedores.some(v => v.name === parsedUser.name)){ loginUser(parsedUser); } else { console.warn("Usuário salvo inválido."); localStorage.removeItem('eletroIAUser'); displayLoginScreen(); } } catch(e) { console.error("Erro parse usuário:", e); localStorage.removeItem('eletroIAUser'); displayLoginScreen(); } } else { displayLoginScreen(); }
+};
+
+const displayLoginScreen = () => {
+     if(userScreen) userScreen.classList.remove('hidden'); if(app) app.classList.add('hidden');
+     if (userList) { if(vendedores.length > 0){ userList.innerHTML = vendedores.map(user => `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'> <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p> <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p> </div>`).join(''); } else { userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; } } else { console.error("userList não encontrado."); if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login."); }
+};
 
 
-  <div id="pedidoModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
-    <div class="modal-content w-full max-w-xl">
-      <div class="modal-header">
-        <h2 id="pedidoModalTitle" class="text-2xl font-bold text-gray-800">Novo Pedido</h2>
-        <button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button>
-      </div>
-      <div class="modal-body">
-        <form id="pedidoForm" class="space-y-4">
-          <input type="hidden" id="pedidoId">
-          <div><label for="clienteNome" class="block text-sm font-medium text-gray-700">Cliente / Empresa *</label><input id="clienteNome" type="text" placeholder="Nome ou Razão Social" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></div>
-          <div><label for="vendedorResponsavel" class="block text-sm font-medium text-gray-700">Vendedor *</label><select id="vendedorResponsavel" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"><option value=""></option></select></div>
-          <div><label class="block text-sm font-medium text-gray-700">Itens Iniciais (Opcional)</label><div id="servicosList" class="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 border rounded-md bg-gray-50 max-h-40 overflow-y-auto"></div></div>
-          <div><label for="pedidoObservacoes" class="block text-sm font-medium text-gray-700">Observações Iniciais</label><textarea id="pedidoObservacoes" placeholder="Ex: Urgência, item específico..." rows="3" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea></div>
-        </form>
-      </div>
-      <div class="modal-footer"><button type="button" class="btn-close-modal btn btn-gray">Cancelar</button><button type="submit" form="pedidoForm" class="btn btn-blue">Salvar Pedido</button></div>
-    </div>
-  </div>
+/* ==================================================================
+LÓGICA DO DASHBOARD E KANBAN
+==================================================================
+*/
+const initializeDashboard = () => {
+    if (!vendedorDashboard) { console.error("vendedorDashboard não encontrado."); return; } if (vendedores.length === 0) { vendedorDashboard.innerHTML = '<p class="text-red-500">Erro: Vendedores não carregados.</p>'; return; }
+    vendedorDashboard.innerHTML = '';
+    const vendedoresToShow = isMyAgendaViewActive ? vendedores.filter(v => v.name === currentUser.name) : vendedores;
+    vendedoresToShow.forEach(vendedor => {
+        const vendedorSection = document.createElement('section'); vendedorSection.className = 'vendedor-section'; vendedorSection.id = `section-${vendedor.name.replace(/\s+/g, '-')}`; const header = document.createElement('h2'); header.className = 'vendedor-header'; header.textContent = vendedor.name; vendedorSection.appendChild(header); const kanbanContainer = document.createElement('div'); kanbanContainer.className = 'kanban-container';
+        STATUS_LIST.forEach(status => { const statusColumn = document.createElement('div'); statusColumn.className = 'status-column'; statusColumn.dataset.statusHeader = status; const statusHeader = document.createElement('h3'); statusHeader.textContent = formatStatus(status); statusColumn.appendChild(statusHeader); const clientList = document.createElement('div'); clientList.className = 'client-list'; clientList.dataset.status = status; clientList.dataset.vendedor = vendedor.name; clientList.innerHTML = '<p class="text-gray-400 text-xs italic p-4 tc">Carregando...</p>'; statusColumn.appendChild(clientList); kanbanContainer.appendChild(statusColumn); });
+        vendedorSection.appendChild(kanbanContainer); vendedorDashboard.appendChild(vendedorSection);
+    });
+     if(dashboardTitle) dashboardTitle.textContent = isMyAgendaViewActive ? `Minha Agenda - ${currentUser.name}` : 'Visão Geral - Todos Vendedores';
+};
 
-  <div id="detailsModal" class="modal fixed inset-0 z-50 hidden items-start justify-center p-4 modal-backdrop">
-     <div class="modal-content w-full max-w-6xl">
-      <div class="modal-header"><div class="flex justify-between items-start w-full"><div><h2 id="detailsClienteNome" class="text-2xl font-bold text-gray-800"></h2><p id="detailsPedidoNumero" class="text-sm font-bold text-blue-800"></p></div><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div></div>
-      <div class="modal-body"><div class="os-details-container"><div class="os-header"><div class="flex justify-between items-start flex-wrap gap-4"><div class="mb-4"><p id="detailsAgendamento" class="text-sm text-gray-600"></p><p id="detailsVendedor" class="text-lg text-gray-800 font-bold mt-1"></p></div><div class="bg-gray-100 p-4 rounded-lg text-center w-full sm:w-auto flex-shrink-0 border border-gray-200"><p class="text-gray-600 font-bold uppercase text-xs">Valor Atual</p><p id="detailsValorTotalDisplay" class="font-bold text-3xl text-green-700"></p></div></div><div id="detailsObservacoesContainer" class="hidden mt-4 pt-4 border-t border-gray-200"></div></div><div class="os-content"><div class="space-y-6"><div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-basket mr-1'></i>Itens</h3><div id="detailsItensContainer" class="mt-1 space-y-2"></div><div class="mt-4 pt-4 border-t border-gray-200"><h4 class="text-sm font-medium text-gray-600 mb-2">Adicionar Item</h4><div class="flex gap-2"><select id="detailsServicosList" class="p-2 border rounded w-full bg-white flex-grow focus:ring-blue-500 focus:border-blue-500"><option value=""></option></select><button type="button" id="detailsAddServicoBtn" class="btn btn-dark-gray px-3 flex-shrink-0">Add</button></div></div></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-history mr-1'></i>Histórico Cliente</h3><div id="detailsHistoricoCliente" class="mt-4 space-y-3 max-h-48 overflow-y-auto pr-2"></div></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-images mr-1'></i>Mídia</h3><div id="thumbnail-grid" class="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-4"></div></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-list-ul mr-1'></i>Histórico Pedido</h3><div id="timelineContainer" class="timeline mt-4 space-y-6"></div></div></div><div class="os-actions-section space-y-6"><div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-lg shadow p-4 border border-blue-200"><h3 class="section-title text-blue-800"><i class='bx bxs-magic-wand mr-1'></i>Assistente IA</h3><div id="assistenteVendasOutput" class="mt-3 space-y-2 text-sm text-blue-900"></div><button id="geminiRefreshBtn" class="text-xs text-blue-600 hover:underline mt-2 flex items-center gap-1 hidden"><i class='bx bx-refresh'></i> Novas Sugestões</button></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-message-add mr-1'></i>Atualização</h3><form id="logForm" class="space-y-4"><input type="hidden" id="logPedidoId"><div><label for="logDescricao" class="block text-sm font-medium text-gray-700">Descrição *</label><textarea id="logDescricao" placeholder="Negociação, obs..." rows="3" required class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></textarea></div><div><label class="block text-sm font-medium text-gray-700 mb-1">Anexar</label><div class="grid grid-cols-2 gap-2"><button type="button" id="openCameraBtn" class="w-full btn btn-dark-gray"><i class='bx bxs-camera mr-1'></i> Câm</button><button type="button" id="openGalleryBtn" class="w-full btn btn-dark-gray"><i class='bx bxs-file-plus mr-1'></i> Arq</button></div><input id="media-input" type="file" class="hidden" multiple accept="image/*,video/*,application/pdf"><p id="fileName" class="text-sm text-gray-500 mt-1 truncate h-4"></p></div><button type="submit" class="w-full btn btn-green flex items-center justify-center gap-2"><i class='bx bx-message-square-add'></i> Add Histórico</button></form></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><h3 class="section-title"><i class='bx bx-dollar-circle mr-1'></i>Fechamento</h3><div class="form-group"><label for="detailsFormaPagamento" class="block text-sm font-medium text-gray-700">Pagamento</label><select id="detailsFormaPagamento" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"><option value=""></option></select></div><div class="form-group mt-4"><label for="detailsDesconto" class="block text-sm font-medium text-gray-700">Desconto (R$)</label><input id="detailsDesconto" type="number" step="0.01" value="0" class="mt-1 p-2 border rounded w-full bg-white focus:ring-blue-500 focus:border-blue-500"></div><button type="button" id="saveAndNextStatusBtn" class="w-full btn btn-blue mt-6"><i class='bx bx-fast-forward-circle mr-1'></i> Salvar e Avançar</button></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><button id="gerarOfertaWhatsappBtn" class="w-full btn bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-2"><i class='bx bxl-whatsapp'></i> Gerar Txt Oferta</button></div> <div class="bg-white rounded-lg shadow p-4 border border-gray-200"><button id="deleteBtn" class="w-full btn btn-red hidden"><i class='bx bx-trash mr-1'></i> Excluir Pedido</button></div></div></div></div></div>
-    </div>
-  </div>
+const createCardHTML = (pedido) => {
+    const clienteDisplay = (pedido.clienteNome || 'Cliente Desc.').substring(0, 25); const dataDisplay = formatDateTime(pedido.createdAt || pedido.agendamento); const itensArray = Array.isArray(pedido.itens)?pedido.itens:[]; const itensDisplay = itensArray.length > 0 ? itensArray.map(s => s.name).join(', ') : "S/ Itens"; const valorDisplay = formatCurrency(pedido.valorTotal); const vendedorDisplay = pedido.vendedorResponsavel || 'N/A'; const currentStatusIndex = STATUS_LIST.indexOf(pedido.status); const nextStatus = currentStatusIndex < STATUS_LIST.length - 1 ? STATUS_LIST[currentStatusIndex + 1] : null; const prevStatus = currentStatusIndex > 0 ? STATUS_LIST[currentStatusIndex - 1] : null;
+    return `<div id="${pedido.id}" class="vehicle-card status-${pedido.status}" data-id="${pedido.id}"><div class="flex justify-between items-start"><div class="card-clickable-area cursor-pointer flex-grow space-y-1 pr-2 card-info overflow-hidden"><div class="flex justify-between items-baseline"><p class="name truncate" title="${pedido.clienteNome||''}">${clienteDisplay}</p><p class="time flex-shrink-0 ml-2">${dataDisplay}</p></div><p class="text-sm truncate service text-gray-600" title="${itensDisplay}">${itensDisplay}</p><div class="flex justify-between items-center mt-2 pt-1 border-t border-gray-100"><p class="barber text-xs">${vendedorDisplay}</p><p class="price font-semibold">${valorDisplay}</p></div></div><div class="flex flex-col items-center justify-center -mt-1 -mr-1 flex-shrink-0"><button data-id="${pedido.id}" data-new-status="${nextStatus}" class="btn-move-status p-1 rounded-full text-gray-400 hover:text-blue-600 hover:bg-blue-100 ${!nextStatus?'invisible':''}" title="Avançar"><i class='bx bx-chevron-right text-2xl'></i></button><button data-id="${pedido.id}" data-new-status="${prevStatus}" class="btn-move-status p-1 rounded-full text-gray-400 hover:text-orange-600 hover:bg-orange-100 ${!prevStatus?'invisible':''}" title="Retroceder"><i class='bx bx-chevron-left text-2xl'></i></button></div></div></div>`;
+};
 
-  <div id="configModal" class="modal fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop">
-      <div class="modal-content w-full max-w-3xl"><div class="modal-header"><h2 class="text-2xl font-bold text-gray-800">⚙️ Gerenciar Produtos</h2><button class="btn-close-modal text-3xl text-gray-400 hover:text-gray-600">&times;</button></div><div class="modal-body"><div><h3 class="section-title">Catálogo</h3><div id="configServicosList" class="space-y-2 mb-4 max-h-60 overflow-y-auto border p-2 rounded bg-gray-50"></div><form id="addServicoForm" class="flex flex-wrap gap-2 border-t pt-4"><input type="text" id="newServicoName" placeholder="Nome Produto/Serviço" class="p-2 border rounded flex-grow min-w-[200px] bg-white focus:ring-blue-500 focus:border-blue-500" required><input type="number" id="newServicoPrice" placeholder="Preço" class="p-2 border rounded w-full sm:w-auto bg-white focus:ring-blue-500 focus:border-blue-500" required step="0.01" min="0"><button type="submit" class="btn btn-blue w-full sm:w-auto">Adicionar</button></form></div></div><div class="modal-footer"><button type="button" class="btn-close-modal btn btn-gray">Fechar</button></div></div>
-  </div>
+ const renderCard = (pedido) => {
+   if (!pedido?.vendedorResponsavel || !pedido.status || !pedido.id) { console.warn("Render inválido:", pedido); return; } if (isMyAgendaViewActive && pedido.vendedorResponsavel !== currentUser.name) { const existing = document.getElementById(pedido.id); if (existing) existing.remove(); return; } const cardHTML = createCardHTML(pedido); const listSelector = `#vendedorDashboard .client-list[data-vendedor="${pedido.vendedorResponsavel}"][data-status="${pedido.status}"]`; let list = document.querySelector(listSelector); if (!list) { console.warn(`Lista ${listSelector} não achada. Fallback.`); const fallbackSelector = `#vendedorDashboard .client-list[data-status="${pedido.status}"]`; list = document.querySelector(fallbackSelector); } const existingCard = document.getElementById(pedido.id); if (existingCard) { existingCard.remove(); } if (list) { const placeholder = list.querySelector('p.text-gray-400'); if (placeholder) placeholder.remove(); list.insertAdjacentHTML('beforeend', cardHTML); } else { console.error(`CRÍTICO: Lista ${pedido.status} não achada. Card ${pedido.id} perdido.`); }
+ };
 
-  <div id="lightbox" class="modal fixed inset-0 z-[100] hidden items-center justify-center p-4 modal-backdrop"><div class="absolute inset-0" id="lightbox-close-bg"></div><div class="relative bg-black bg-opacity-75 p-4 rounded-lg max-w-4xl max-h-[90vh] w-auto"><div id="lightbox-content" class="flex items-center justify-center overflow-auto max-h-[calc(90vh-4rem)]"></div><button id="lightbox-close" class="absolute -top-3 -right-3 bg-white text-black rounded-full h-8 w-8 flex items-center justify-center text-2xl shadow-lg border-2 border-gray-300">&times;</button></div></div>
-  <div id="confirmDeleteModal" class="modal fixed inset-0 z-[101] hidden items-center justify-center p-4 modal-backdrop"><div class="modal-content w-full max-w-md"><div class="modal-header items-center"><i class='bx bxs-error-circle text-red-600 text-3xl mr-3'></i><h2 class="text-xl font-bold text-gray-800">Confirmar</h2></div><div class="modal-body"><p id="confirmDeleteText" class="text-center text-gray-700"></p></div><div class="modal-footer"><button id="cancelDeleteBtn" class="btn btn-gray">Cancelar</button><button id="confirmDeleteBtn" class="btn btn-red">Excluir</button></div></div></div>
+const toggleMyAgendaView = () => {
+    isMyAgendaViewActive = !isMyAgendaViewActive;
+    if(toggleAgendaBtn) { toggleAgendaBtn.classList.toggle('bg-blue-100', isMyAgendaViewActive); toggleAgendaBtn.classList.toggle('text-blue-700', isMyAgendaViewActive); toggleAgendaBtn.classList.toggle('border-blue-300', isMyAgendaViewActive); toggleAgendaBtn.classList.toggle('bg-white', !isMyAgendaViewActive); toggleAgendaBtn.classList.toggle('text-gray-700', !isMyAgendaViewActive); toggleAgendaBtn.classList.toggle('border-gray-300', !isMyAgendaViewActive); }
+    initializeDashboard(); Object.values(allPedidos).forEach(renderCard);
+    if(vendedorDashboard){ vendedorDashboard.querySelectorAll('.client-list').forEach(list => { if(list.children.length === 0){ list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } }); }
+};
 
-  <div id="notification-container" class="fixed bottom-0 right-0 p-4 space-y-2 z-[9999]"></div>
+/* ==================================================================
+LISTENERS DO FIREBASE
+==================================================================
+*/
+const listenToPedidos = () => {
+    if (!db) { console.error("DB Firebase não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false; listenersAttached = false; // Reseta flag de listeners
+    if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>'); }
+    else { console.error("Dashboard não encontrado."); return; } allPedidos = {};
+    ref.once('value', snapshot => {
+        allPedidos = snapshot.val() || {}; Object.keys(allPedidos).forEach(key => { if(allPedidos[key]) allPedidos[key].id = key; });
+        if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = ''); }
+        Object.values(allPedidos).forEach(renderCard);
+        if(vendedorDashboard){ vendedorDashboard.querySelectorAll('.client-list').forEach(list => { if(list.children.length === 0){ list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } }); }
+        initialDataLoaded = true; console.log(`Carga: ${Object.keys(allPedidos).length} pedidos.`);
 
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  
-  <script src="js/app_logic.js"></script>
-  <script src="js/app_setup.js"></script>
+        // ***** ALTERAÇÃO CRÍTICA: CHAMA setupEventListeners AQUI, APENAS UMA VEZ *****
+        if (!listenersAttached && typeof setupEventListeners === 'function') {
+            setupEventListeners(); // Chama a função para anexar os listeners
+            listenersAttached = true; // Marca que foram anexados
+            console.log("Listeners de eventos configurados após carga inicial.");
+        } else if (listenersAttached) {
+             console.log("Listeners já estavam configurados.");
+        } else {
+             console.error("ERRO GRAVE: Função setupEventListeners não encontrada em app_logic.js");
+             showNotification("Erro: Falha ao carregar interações.", "error");
+        }
+        // ***** FIM DA ALTERAÇÃO *****
 
-</body>
-</html>
+        startIndividualListeners(ref); // Inicia listeners individuais para updates
+
+    }, error => { console.error("Erro carga inicial:", error); showNotification("Erro dados.", "error"); if (vendedorDashboard) { vendedorDashboard.innerHTML = '<p class="tc text-red-500 my-10">Falha carregar.</p>'; } });
+};
+
+const startIndividualListeners = (ref) => {
+    // Novo pedido
+    ref.on('child_added', snapshot => { if (!initialDataLoaded) return; const pedido = { ...snapshot.val(), id: snapshot.key }; if (!allPedidos[pedido.id]) { console.log("Novo:", pedido.id); allPedidos[pedido.id] = pedido; renderCard(pedido); } });
+    // Pedido modificado
+    ref.on('child_changed', snapshot => { if (!initialDataLoaded) return; const pedido = { ...snapshot.val(), id: snapshot.key }; console.log("Modificado:", pedido.id); allPedidos[pedido.id] = pedido; renderCard(pedido); if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedido.id) { openDetailsModal(pedido.id); } });
+    // Pedido removido
+    ref.on('child_removed', snapshot => { if (!initialDataLoaded) return; const pedidoId = snapshot.key; console.log("Removido:", pedidoId); delete allPedidos[pedidoId]; const card = document.getElementById(pedidoId); if (card) { const list = card.parentElement; card.remove(); if (list && list.children.length === 0) { list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } } if (detailsModal && !detailsModal.classList.contains('hidden') && document.getElementById('logPedidoId')?.value === pedidoId) { detailsModal.classList.add('hidden'); showNotification("Pedido excluído.", "warning"); } });
+};
+
+const loadConfig = async () => {
+     try { if (!db) throw new Error("DB não disponível."); const snapshot = await db.ref('config').once('value'); configData = snapshot.val() || { produtos: [] }; if (configData.produtos && typeof configData.produtos === 'object' && !Array.isArray(configData.produtos)) { configData.produtos = Object.values(configData.produtos); } else if (!Array.isArray(configData.produtos)) { configData.produtos = []; } configData.produtos.sort((a, b) => (a.name || '').localeCompare(b.name || '')); console.log("Config carregada:", configData.produtos.length, "produtos."); } catch (error) { console.error("Erro loadConfig:", error); showNotification("Erro carregar produtos.", "error"); configData = { produtos: [] }; }
+};
+
+
+/* ==================================================================
+INICIALIZAÇÃO DA APLICAÇÃO (Chamada no final de app_logic.js)
+==================================================================
+*/
+// Garante que o DOM esteja pronto ANTES de tentar configurar listeners ou checar login
+if (document.readyState === 'loading') {
+    // Adiciona listener APENAS para checkLoggedInUser. setupEventListeners será chamado DENTRO de loginUser via listenToPedidos.
+    document.addEventListener('DOMContentLoaded', checkLoggedInUser);
+} else {
+    // DOM já pronto, chama checkLoggedInUser imediatamente.
+    checkLoggedInUser();
+}
+
+// Nota: setupEventListeners AGORA é chamado DENTRO de listenToPedidos, APÓS a carga inicial dos dados.
+
+// --- FIM app_setup.js ---

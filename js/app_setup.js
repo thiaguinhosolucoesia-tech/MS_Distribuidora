@@ -1,29 +1,3 @@
-/* ==== PATCHED START: safety & env guards ====
-  - Verifica variáveis essenciais (Firebase, Cloudinary, GEMINI)
-  - Define flags de disponibilidade para UI/funcionalidades
-  - Mantém compatibilidade com o restante do código
-*/
-const ELETROIA_ENV = {
-  hasFirebaseConfig: typeof firebaseConfig !== 'undefined',
-  hasCloudinary: typeof CLOUDINARY_CLOUD_NAME !== 'undefined' && typeof CLOUDINARY_UPLOAD_PRESET !== 'undefined',
-  hasGeminiKey: typeof GEMINI_API_KEY !== 'undefined' && GEMINI_API_KEY && !GEMINI_API_KEY.includes('COLE_SUA')
-};
-
-// Se firebaseConfig não existir por algum motivo, define placeholder e bloqueia ações sensíveis.
-if (!ELETROIA_ENV.hasFirebaseConfig) {
-  console.warn("Firebase config ausente. Muitas funcionalidades serão desabilitadas.");
-  window.firebaseConfig = window.firebaseConfig || {};
-}
-
-// Ajuste de UX: função para mostrar erro crítico e desabilitar formulários
-function criticalError(message) {
-  console.error("CRITICAL:", message);
-  showNotification(message, 'error');
-  // desabilitar botões principais se existirem
-  document.querySelectorAll('button, input, textarea').forEach(el => el.disabled = true);
-}
-/* ==== PATCHED END ==== */
-
 /* ==================================================================
 PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 1: SETUP
 Versão: FINAL COMPLETA e CORRIGIDA (Listener Timing Fix) - 23/10/2025
@@ -190,21 +164,55 @@ const loginUser = async (user) => {
 
     await loadConfig();
     initializeDashboard(); // Prepara a estrutura do dashboard
-    listenToPedidos(); // Inicia o carregamento e monitoramento dos pedidos (que chamará setupEventListeners)
+    listenToPedidos(); // Inicia o carregamento e monitoramento dos pedidos
 
-    // A chamada setupEventListeners() FOI MOVIDA para dentro de listenToPedidos,
-    // para garantir que execute APÓS a carga inicial e renderização.
+    // A chamada setupEventListeners() FOI MOVIDA para a inicialização (startApp)
+    // para garantir que os botões de login funcionem.
 
     if (isGestor) renderDashboardGerencial(); else switchDashboardTab('vendas');
 };
 
 const checkLoggedInUser = async () => {
-    await loadVendedores(); const storedUser = localStorage.getItem('eletroIAUser'); if (storedUser) { try { const parsedUser = JSON.parse(storedUser); if(vendedores.some(v => v.name === parsedUser.name)){ loginUser(parsedUser); } else { console.warn("Usuário salvo inválido."); localStorage.removeItem('eletroIAUser'); displayLoginScreen(); } } catch(e) { console.error("Erro parse usuário:", e); localStorage.removeItem('eletroIAUser'); displayLoginScreen(); } } else { displayLoginScreen(); }
+    // Esta função é 'async' pois depende de 'loadVendedores'
+    await loadVendedores(); 
+    const storedUser = localStorage.getItem('eletroIAUser'); 
+    if (storedUser) { 
+        try { 
+            const parsedUser = JSON.parse(storedUser); 
+            if(vendedores.some(v => v.name === parsedUser.name)){ 
+                loginUser(parsedUser); // Usuário já logado, entra direto
+            } else { 
+                console.warn("Usuário salvo inválido."); 
+                localStorage.removeItem('eletroIAUser'); 
+                displayLoginScreen(); // Usuário salvo não existe mais, mostra login
+            } 
+        } catch(e) { 
+            console.error("Erro parse usuário:", e); 
+            localStorage.removeItem('eletroIAUser'); 
+            displayLoginScreen(); // Erro, mostra login
+        } 
+    } else { 
+        displayLoginScreen(); // Nenhum usuário salvo, mostra login
+    }
 };
 
 const displayLoginScreen = () => {
      if(userScreen) userScreen.classList.remove('hidden'); if(app) app.classList.add('hidden');
-     if (userList) { if(vendedores.length > 0){ userList.innerHTML = vendedores.map(user => `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'> <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p> <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p> </div>`).join(''); } else { userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; } } else { console.error("userList não encontrado."); if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login."); }
+     if (userList) { 
+         if(vendedores.length > 0){ 
+            userList.innerHTML = vendedores.map(user => 
+                `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg hover:bg-blue-100 hover:shadow-md cursor-pointer shadow-sm transition-all user-btn" data-user='${JSON.stringify(user).replace(/'/g, "&apos;")}'> 
+                  <p class="font-semibold text-gray-800 pointer-events-none">${user.name}</p> 
+                  <p class="text-sm text-gray-500 pointer-events-none">${user.role||'Vendedor'}</p> 
+                </div>`
+            ).join(''); 
+        } else { 
+            userList.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro: Vendedores não configurados.</p>'; 
+        } 
+    } else { 
+        console.error("userList não encontrado."); 
+        if(userScreen && !userScreen.classList.contains('hidden')) alert("Erro interface login."); 
+    }
 };
 
 
@@ -245,9 +253,11 @@ LISTENERS DO FIREBASE
 ==================================================================
 */
 const listenToPedidos = () => {
-    if (!db) { console.error("DB Firebase não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false; listenersAttached = false; // Reseta flag de listeners
+    if (!db) { console.error("DB Firebase não inicializado."); return; } const ref = db.ref('pedidos'); initialDataLoaded = false;
+    // A flag 'listenersAttached' é controlada pelo bloco de inicialização (startApp)
     if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4 animate-pulse">Carregando...</p>'); }
     else { console.error("Dashboard não encontrado."); return; } allPedidos = {};
+    
     ref.once('value', snapshot => {
         allPedidos = snapshot.val() || {}; Object.keys(allPedidos).forEach(key => { if(allPedidos[key]) allPedidos[key].id = key; });
         if (vendedorDashboard) { vendedorDashboard.querySelectorAll('.client-list').forEach(list => list.innerHTML = ''); }
@@ -255,18 +265,20 @@ const listenToPedidos = () => {
         if(vendedorDashboard){ vendedorDashboard.querySelectorAll('.client-list').forEach(list => { if(list.children.length === 0){ list.innerHTML = '<p class="tc text-gray-400 text-xs italic p-4">Nenhum pedido.</p>'; } }); }
         initialDataLoaded = true; console.log(`Carga: ${Object.keys(allPedidos).length} pedidos.`);
 
-        // ***** ALTERAÇÃO CRÍTICA: CHAMA setupEventListeners AQUI, APENAS UMA VEZ *****
-        if (!listenersAttached && typeof setupEventListeners === 'function') {
-            setupEventListeners(); // Chama a função para anexar os listeners
-            listenersAttached = true; // Marca que foram anexados
-            console.log("Listeners de eventos configurados após carga inicial.");
-        } else if (listenersAttached) {
-             console.log("Listeners já estavam configurados.");
+        // Confirma que os listeners de clique já foram anexados pela função startApp()
+        if (listenersAttached) {
+             console.log("Listeners de eventos (clique) já configurados pela inicialização.");
         } else {
-             console.error("ERRO GRAVE: Função setupEventListeners não encontrada em app_logic.js");
-             showNotification("Erro: Falha ao carregar interações.", "error");
+             // Isso é um fallback, mas não deve acontecer no fluxo normal
+             console.error("ERRO GRAVE: Listeners de clique não foram anexados na inicialização.");
+             // Tenta anexar agora para salvar a aplicação
+             if (typeof setupEventListeners === 'function') {
+                setupEventListeners();
+                listenersAttached = true;
+             } else {
+                showNotification("Erro: Falha ao carregar interações.", "error");
+             }
         }
-        // ***** FIM DA ALTERAÇÃO *****
 
         startIndividualListeners(ref); // Inicia listeners individuais para updates
 
@@ -288,18 +300,34 @@ const loadConfig = async () => {
 
 
 /* ==================================================================
-INICIALIZAÇÃO DA APLICAÇÃO (Chamada no final de app_logic.js)
+INICIALIZAÇÃO DA APLICAÇÃO (BLOCO CORRIGIDO)
 ==================================================================
 */
+
+// Função unificada de inicialização
+const startApp = async () => { // <--- CORREÇÃO: Adicionado 'async'
+    
+     // 1. ESPERA (await) a checagem de login terminar
+     //    Isso garante que loadVendedores() e displayLoginScreen() já rodaram.
+     await checkLoggedInUser(); // <--- CORREÇÃO: Adicionado 'await'
+     
+     // 2. Anexa TODOS os listeners de eventos (incluindo o userList da tela de login)
+     //    A verificação 'typeof' garante que app_logic.js foi carregado
+     if (typeof setupEventListeners === 'function') {
+        setupEventListeners();
+        listenersAttached = true; // Informa o 'listenToPedidos' que já foi executado.
+     } else {
+        console.error("ERRO CRÍTICO: app_logic.js não carregou a função setupEventListeners.");
+        showNotification("Erro: Falha ao carregar interações.", "error");
+     }
+};
+
 // Garante que o DOM esteja pronto ANTES de tentar configurar listeners ou checar login
 if (document.readyState === 'loading') {
-    // Adiciona listener APENAS para checkLoggedInUser. setupEventListeners será chamado DENTRO de loginUser via listenToPedidos.
-    document.addEventListener('DOMContentLoaded', checkLoggedInUser);
+    document.addEventListener('DOMContentLoaded', startApp);
 } else {
-    // DOM já pronto, chama checkLoggedInUser imediatamente.
-    checkLoggedInUser();
+    // DOM já pronto, chama a inicialização
+    startApp();
 }
-
-// Nota: setupEventListeners AGORA é chamado DENTRO de listenToPedidos, APÓS a carga inicial dos dados.
 
 // --- FIM app_setup.js ---

@@ -1,11 +1,11 @@
-/* ==================================================================
+* ==================================================================
 PROTÓTIPO HÍBRIDO EletroIA-MVP - PARTE 2: LÓGICA
 Versão: FINAL COMPLETA e CORRIGIDA (Listeners Fix) - 23/10/2025
 ==================================================================
 */
 
 // Este arquivo DEPENDE das variáveis e funções definidas em app_setup.js
-// Garanta que app_setup.js seja carregado ANTES deste no index.html
+// Este arquivo deve ser carregado ANTES de app_setup.js no index.html
 
 /* ==================================================================
 FUNÇÕES DE MANIPULAÇÃO DE PEDIDOS
@@ -38,6 +38,44 @@ const updatePedidoStatus = async (id, newStatus) => {
         console.error("Erro ao atualizar status do pedido:", error);
         showNotification("Falha ao mover o pedido. Tente novamente.", "error");
     }
+};
+
+const openNewPedidoModal = () => {
+    if (!pedidoForm || !pedidoModal) { console.error("Modal de novo pedido não encontrado."); return; }
+    pedidoForm.reset(); // Limpa o formulário
+    const pedidoIdInput = document.getElementById('pedidoId');
+    if(pedidoIdInput) pedidoIdInput.value = ''; // Limpa ID oculto
+    const modalTitle = document.getElementById('pedidoModalTitle');
+    if(modalTitle) modalTitle.textContent = 'Novo Pedido de Venda'; // Define título
+
+    // Popula dropdown de vendedores
+    const vendedorSelect = document.getElementById('vendedorResponsavel');
+    if (vendedorSelect && vendedores.length > 0) {
+        vendedorSelect.innerHTML = '<option value="">Selecione Vendedor...</option>' + vendedores.map(v =>
+            `<option value="${v.name}" ${currentUser && currentUser.name === v.name ? 'selected' : ''}>${v.name}</option>`
+        ).join('');
+    } else if (vendedorSelect) {
+         vendedorSelect.innerHTML = '<option value="">Erro: Vendedores não carregados</option>';
+    }
+
+    // Popula lista de produtos iniciais (checkboxes)
+    const servicosListContainer = document.getElementById('servicosList');
+    if (servicosListContainer && configData.produtos) {
+        if (configData.produtos.length > 0) {
+             servicosListContainer.innerHTML = configData.produtos.map(p => `
+                <label class="flex items-center space-x-2 cursor-pointer p-2 bg-white rounded-md shadow-sm hover:bg-gray-50 border border-gray-200">
+                   <input type="checkbox" value="${p.price}" data-name="${p.name}" class="form-checkbox h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                   <span class="text-sm text-gray-700">${p.name} (${formatCurrency(p.price)})</span>
+                </label>`).join('');
+        } else {
+             servicosListContainer.innerHTML = '<p class="text-gray-500 text-sm col-span-full italic">Nenhum produto cadastrado.</p>';
+        }
+    } else if (servicosListContainer) {
+         servicosListContainer.innerHTML = '<p class="text-red-500 text-sm col-span-full">Erro ao carregar produtos.</p>';
+    }
+
+    pedidoModal.classList.remove('hidden'); // Mostra o modal
+    pedidoModal.classList.add('flex');
 };
 
 const saveNewPedido = async (e) => {
@@ -357,48 +395,10 @@ const setupEventListeners = () => {
 };
 
 /* ==================================================================
-INICIALIZAÇÃO DA APLICAÇÃO
+INICIALIZAÇÃO DA APLICAÇÃO (BLOCO REMOVIDO)
 ==================================================================
 */
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', () => { checkLoggedInUser(); setupEventListeners(); }); }
-else { checkLoggedInUser(); setupEventListeners(); }
-
-
-/* ==== PATCHED INIT: ensure single init and wait for data ==== */
-let _setupCalled = false;
-async function safeInitializeApp() {
-  if (_setupCalled) return;
-  _setupCalled = true;
-  try {
-    if (!ELETROIA_ENV.hasFirebaseConfig) {
-      criticalError("Config do Firebase não detectada. Verifique a configuração em app_setup.js");
-      return;
-    }
-    // Caso precise aguardar carga inicial de dados do DB antes de ativar listeners
-    const waitForData = () => new Promise((res) => {
-      const t0 = Date.now();
-      const check = () => {
-        if (initialDataLoaded) return res(true);
-        if (Date.now()-t0 > 5000) return res(false); // timeout 5s
-        setTimeout(check, 200);
-      };
-      check();
-    });
-    const loaded = await waitForData();
-    if (!loaded) console.warn("initialDataLoaded não foi sinalizado em 5s — continuando com listeners.");
-    setupEventListeners();
-  } catch (e) {
-    console.error("Erro na inicialização segura:", e);
-    showNotification('Erro na inicialização. Veja console.', 'error');
-  }
-}
-/* Chama safeInitializeApp no load do DOM */
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', safeInitializeApp);
-} else {
-  safeInitializeApp();
-}
-/* ==== PATCHED INIT END ==== */
-
+// --- O bloco de inicialização duplicado foi removido daqui ---
+// A inicialização é controlada exclusivamente pelo app_setup.js
 
 // --- FIM DO CÓDIGO ---
